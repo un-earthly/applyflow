@@ -91,9 +91,7 @@ export default function TeamMembersPage(): React.ReactElement {
           <p className="text-muted-foreground text-sm">Manage who has access to your workspace.</p>
         </div>
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><UserPlus className="mr-2 h-4 w-4" />Invite member</Button>
-          </DialogTrigger>
+          <DialogTrigger render={<Button size="sm"><UserPlus className="mr-2 h-4 w-4" />Invite member</Button>} />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Invite a team member</DialogTitle>
@@ -182,11 +180,7 @@ export default function TeamMembersPage(): React.ReactElement {
               </TableCell>
               <TableCell>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>} />
                   <DropdownMenuContent align="end">
                     {member.status === "pending" && (
                       <DropdownMenuItem>Resend invite</DropdownMenuItem>
