@@ -1,29 +1,116 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read/write their own profile
+    // Helper: is the requester the owner of this document's userId field?
+    function isOwner() {
+      return request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    function isCreatingOwn() {
+      return request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Profiles — only owner
     match /profiles/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Resumes
+    match /resumes/{resumeId} {
+      allow read, update, delete: if isOwner();
+      allow create: if isCreatingOwn();
+    }
+
+    // Resume versions
+    match /resumeVersions/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if isCreatingOwn();
+    }
+
+    // Applications
+    match /applications/{applicationId} {
+      allow read, update, delete: if isOwner();
+      allow create: if isCreatingOwn();
+    }
+
+    // Cover letters
+    match /coverLetters/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if isCreatingOwn();
+    }
+
+    // Saved jobs
+    match /savedJobs/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if isCreatingOwn();
+    }
+
+    // Job preferences
+    match /jobPreferences/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    // Users can only read/write their own resumes
-    match /resumes/{resumeId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+    // Notification settings
+    match /notificationSettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    // Users can only read/write their own applications
-    match /applications/{applicationId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+    // Privacy settings
+    match /privacySettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    // Users can only read/write tailored resumes linked to their resumes
-    match /tailoredResumes/{docId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+    // Review queue (extension submissions)
+    match /reviewQueue/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if isCreatingOwn();
     }
-    // Admin-only collections
+
+    // LLM usage tracking (read own, write via server only)
+    match /llmUsage/{docId} {
+      allow read: if isOwner();
+      allow write: if false; // server-side only
+    }
+
+    // Extension tokens (server-side only)
+    match /extensionTokens/{token} {
+      allow read, write: if false;
+    }
+
+    // Support tickets (user can create, read own)
+    match /supportTickets/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update: if false; // admin only via server
+    }
+
+    // Feature flags (public read, admin write via server)
+    match /featureFlags/{flagId} {
+      allow read: if request.auth != null;
+      allow write: if false; // admin only via server
+    }
+
+    // Announcements (public read, admin write via server)
+    match /announcements/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false; // admin only via server
+    }
+
+    // Audit logs (server-write only)
+    match /auditLogs/{docId} {
+      allow read, write: if false;
+    }
+
+    // Job boards config (public read for extension, server write)
+    match /jobBoards/{boardId} {
+      allow read: if true;
+      allow write: if false; // admin only via server
+    }
+
+    // Subscriptions — read own, server writes from Stripe webhook
     match /subscriptions/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false; // server-side only
+      allow write: if false;
     }
   }
 }
