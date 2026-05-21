@@ -6,11 +6,13 @@ import { z } from "zod";
 import { parseBody } from "@/lib/api-validate";
 
 const applicationUpdateSchema = z.object({
-  companyName: z.string().min(1).max(200).optional(),
-  roleTitle: z.string().min(1).max(200).optional(),
-  jobUrl: z.string().url().or(z.literal("")).optional(),
-  source: z.enum(["linkedin","indeed","greenhouse","lever","workday","ashby","direct","referral","other"]).optional(),
-  status: z.enum(["applied","screening","interview","offer","rejected","ghosted"]).optional(),
+  company: z.string().min(1).max(200).optional(),
+  role: z.string().min(1).max(200).optional(),
+  url: z.string().url().or(z.literal("")).optional(),
+  source: z
+    .enum(["linkedin", "indeed", "greenhouse", "lever", "workday", "ashby", "direct", "referral", "other"])
+    .optional(),
+  status: z.enum(["applied", "screening", "interview", "offer", "rejected", "ghosted"]).optional(),
   location: z.string().max(200).optional(),
   salaryRange: z.string().max(100).optional(),
   notes: z.string().max(10000).optional(),
@@ -32,13 +34,16 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+function appRef(uid: string, id: string) {
+  return adminDb().collection("users").doc(uid).collection("applications").doc(id);
+}
+
 export async function GET(req: NextRequest, { params }: RouteContext): Promise<NextResponse> {
   const uid = await getUid(req);
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const snap = await adminDb().collection("applications").doc(id).get();
+  const snap = await appRef(uid, id).get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return NextResponse.json({ id: snap.id, ...snap.data() });
 }
 
@@ -46,10 +51,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext): Promise
   const uid = await getUid(req);
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const ref = adminDb().collection("applications").doc(id);
+  const ref = appRef(uid, id);
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const rawBody = await req.json();
   const parsed = parseBody(applicationUpdateSchema, rawBody);
   if ("error" in parsed) return parsed.error;
@@ -61,10 +65,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext): Promis
   const uid = await getUid(req);
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const ref = adminDb().collection("applications").doc(id);
+  const ref = appRef(uid, id);
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await ref.delete();
   return NextResponse.json({ success: true });
 }
