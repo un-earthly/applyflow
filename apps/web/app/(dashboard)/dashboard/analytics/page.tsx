@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,17 @@ export default function AnalyticsPage(): React.ReactElement {
   const { user } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
-  const isPro = false; // TODO: wire to Firestore subscription
+  const [isPro, setIsPro] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(doc(db, "profiles", user.uid), (snap) => {
+      if (snap.exists()) {
+        const tier = snap.data().subscriptionTier ?? "free";
+        setIsPro(tier !== "free");
+      }
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
