@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@repo/shared": "workspace:^",
@@ -23,6 +26,7 @@
     "firebase-admin": "^13.10.0",
     "lucide-react": "^1.16.0",
     "next": "16.2.0",
+    "openai": "^6.38.0",
     "posthog-js": "^1.374.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
