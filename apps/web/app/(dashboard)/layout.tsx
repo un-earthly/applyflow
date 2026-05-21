@@ -30,6 +30,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CommandPalette } from "@/components/dashboard/command-palette";
 
 const NAV_GROUPS = [
   {
@@ -184,6 +185,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
+      <CommandPalette />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:left-4 focus:top-4 focus:rounded focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"

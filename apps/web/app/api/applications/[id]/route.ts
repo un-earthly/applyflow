@@ -2,6 +2,20 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { z } from "zod";
+import { parseBody } from "@/lib/api-validate";
+
+const applicationUpdateSchema = z.object({
+  companyName: z.string().min(1).max(200).optional(),
+  roleTitle: z.string().min(1).max(200).optional(),
+  jobUrl: z.string().url().or(z.literal("")).optional(),
+  source: z.enum(["linkedin","indeed","greenhouse","lever","workday","ashby","direct","referral","other"]).optional(),
+  status: z.enum(["applied","screening","interview","offer","rejected","ghosted"]).optional(),
+  location: z.string().max(200).optional(),
+  salaryRange: z.string().max(100).optional(),
+  notes: z.string().max(10000).optional(),
+  appliedAt: z.string().datetime().optional(),
+});
 
 async function getUid(req: NextRequest): Promise<string | null> {
   const token = req.headers.get("authorization")?.slice(7);
@@ -36,9 +50,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext): Promise
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const body = await req.json() as Record<string, unknown>;
-  await ref.update({ ...body, updatedAt: FieldValue.serverTimestamp() });
-  return NextResponse.json({ success: true });
+  const rawBody = await req.json();
+  const parsed = parseBody(applicationUpdateSchema, rawBody);
+  if ("error" in parsed) return parsed.error;
+  await ref.update({ ...parsed.data, updatedAt: FieldValue.serverTimestamp() });
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: NextRequest, { params }: RouteContext): Promise<NextResponse> {

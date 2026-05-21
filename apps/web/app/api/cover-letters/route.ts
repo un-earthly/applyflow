@@ -2,6 +2,15 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { z } from "zod";
+import { parseBody } from "@/lib/api-validate";
+
+const coverLetterCreateSchema = z.object({
+  company: z.string().max(200).optional(),
+  role: z.string().max(200).optional(),
+  jd: z.string().max(20000).optional(),
+  resumeId: z.string().optional(),
+});
 
 async function getUid(req: NextRequest): Promise<string | null> {
   const token = req.headers.get("authorization")?.slice(7);
@@ -31,12 +40,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const uid = await getUid(req);
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { company, role, jd, resumeId } = await req.json() as {
-    company?: string;
-    role?: string;
-    jd?: string;
-    resumeId?: string;
-  };
+  const rawBody = await req.json();
+  const parsed = parseBody(coverLetterCreateSchema, rawBody);
+  if ("error" in parsed) return parsed.error;
+  const { company, role, jd, resumeId } = parsed.data;
 
   // In production, generate with OpenAI using the resume content + JD
   const content = `Dear Hiring Manager,\n\nI am excited to apply for the ${role ?? "position"} role at ${company ?? "your company"}.\n\n[AI-generated content will appear here in production]\n\nBest regards`;
