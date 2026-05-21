@@ -15,6 +15,11 @@ import {
   LayoutDashboard,
   LogOut,
   Zap,
+  Briefcase,
+  Globe,
+  BarChart3,
+  ScrollText,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +27,13 @@ const ADMIN_NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/admin/applications", label: "Applications", icon: Briefcase },
+  { href: "/admin/job-boards", label: "Job boards", icon: Globe },
   { href: "/admin/feature-flags", label: "Feature flags", icon: Flag },
   { href: "/admin/support", label: "Support", icon: HeadphonesIcon },
+  { href: "/admin/audit-logs", label: "Audit logs", icon: ScrollText },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
 ];
 
 export default function AdminLayout({
