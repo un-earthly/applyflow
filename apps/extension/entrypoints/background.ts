@@ -213,6 +213,48 @@ export default () => {
     }
   }
 
+  // ── Extension auth pairing — monitors tabs for /auth/extension-success?code= ─
+
+  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status !== "complete" || !tab.url) return;
+    const url = new URL(tab.url);
+    if (!url.href.startsWith(APP_URL) || url.pathname !== "/auth/extension-success") return;
+
+    const code = url.searchParams.get("code");
+    if (!code) return;
+
+    try {
+      const res = await fetch(`${APP_URL}/api/auth/extension-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) return;
+      const { idToken } = (await res.json()) as { idToken: string };
+      if (!idToken) return;
+
+      // Fetch user profile to store alongside token
+      let userData: Record<string, unknown> = {};
+      try {
+        const profileRes = await fetch(`${APP_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (profileRes.ok) {
+          userData = await profileRes.json() as Record<string, unknown>;
+        }
+      } catch {
+        // Non-fatal — auth still works without profile
+      }
+
+      await chrome.storage.local.set({
+        "session:token": idToken,
+        "auth:user": userData,
+      });
+    } catch (err) {
+      console.warn("[ApplyFlow] Extension auth pairing failed:", err);
+    }
+  });
+
   // ── Token refresh alarm (every 50 min) ──────────────────────────────────────
 
   chrome.alarms.create("token-refresh", { periodInMinutes: 50 });

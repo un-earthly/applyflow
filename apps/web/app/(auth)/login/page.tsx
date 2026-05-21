@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +40,8 @@ function LoginForm(): React.ReactElement {
   const { signIn, signInWithGoogle } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  const returnTo = searchParams.get("return");
+  const next = returnTo === "extension" ? null : (searchParams.get("next") ?? "/dashboard");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,13 +49,30 @@ function LoginForm(): React.ReactElement {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const afterAuth = async () => {
+    if (returnTo === "extension") {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const idToken = await currentUser.getIdToken();
+      const code = crypto.randomUUID().replace(/-/g, "");
+      await setDoc(doc(db, "pairings", code), {
+        idToken,
+        expiresAt: Date.now() + 5 * 60 * 1000,
+        createdAt: serverTimestamp(),
+      });
+      router.push(`/auth/extension-success?code=${code}`);
+    } else {
+      router.push(next ?? "/dashboard");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       await signIn(email, password);
-      router.push(next);
+      await afterAuth();
     } catch (err) {
       setError(mapAuthError(err));
     } finally {
@@ -65,7 +85,7 @@ function LoginForm(): React.ReactElement {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
-      router.push(next);
+      await afterAuth();
     } catch (err) {
       setError(mapAuthError(err));
     } finally {
