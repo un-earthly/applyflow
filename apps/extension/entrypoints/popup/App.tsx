@@ -56,7 +56,7 @@ export default function App() {
         {auth.loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-400">Loading…</div>
         ) : activeTab === "home" ? (
-          <HomeTab auth={auth} />
+          <HomeTab />
         ) : activeTab === "current-job" ? (
           <CurrentJobTab />
         ) : activeTab === "activity" ? (
@@ -64,7 +64,7 @@ export default function App() {
         ) : activeTab === "resume" ? (
           <ResumeTab />
         ) : (
-          <SettingsTab auth={auth} />
+          <SettingsTab />
         )}
       </div>
 

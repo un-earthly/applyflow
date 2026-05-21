@@ -4,7 +4,7 @@ export default () => {
     [key: string]: any;
   }
 
-  const APP_URL = process.env.PLASMO_PUBLIC_APP_URL ?? "https://app.applyflow.io";
+  const APP_URL = import.meta.env.VITE_APP_URL ?? "https://app.applyflow.io";
 
   // ── Message bus ─────────────────────────────────────────────────────────────
 

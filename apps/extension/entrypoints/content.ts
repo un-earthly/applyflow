@@ -186,7 +186,7 @@ export default defineContentScript({
     function showReviewPanel() {
       document.getElementById("applyflow-panel-host")?.remove();
       const root = createShadowHost("applyflow-panel-host");
-      root.host.style.pointerEvents = "all";
+      (root.host as HTMLElement).style.pointerEvents = "all";
 
       const style = document.createElement("style");
       style.textContent = OVERLAY_STYLES;
