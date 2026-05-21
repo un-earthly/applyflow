@@ -1,137 +1,237 @@
 export default () => {
-  console.log('ApplyFlow background service worker loaded');
-
   interface MessageRequest {
     type: string;
     [key: string]: any;
   }
 
-  // Message listener for popup and content scripts
+  const APP_URL = process.env.PLASMO_PUBLIC_APP_URL ?? "https://app.applyflow.io";
+
+  // ── Message bus ─────────────────────────────────────────────────────────────
+
   chrome.runtime.onMessage.addListener((request: MessageRequest, sender, sendResponse) => {
-    handleMessage(request, sender, sendResponse);
-    return true; // Allow async response
+    void handleMessage(request, sender, sendResponse);
+    return true;
   });
 
   async function handleMessage(
     request: MessageRequest,
     sender: chrome.runtime.MessageSender,
-    sendResponse: (response?: any) => void
+    sendResponse: (response?: any) => void,
   ) {
     try {
       switch (request.type) {
-        case 'GET_AUTH_STATUS':
-          handleGetAuthStatus(sendResponse);
+        case "GET_AUTH_STATUS":
+          sendResponse(await getAuthStatus());
           break;
 
-        case 'GET_SETTINGS':
-          handleGetSettings(sendResponse);
+        case "GET_SESSION":
+          sendResponse(await getSession());
           break;
 
-        case 'UPDATE_SETTINGS':
-          handleUpdateSettings(request, sendResponse);
+        case "GET_SETTINGS":
+          sendResponse({ settings: await getSettings() });
           break;
 
-        case 'GET_RESUMES':
-          handleGetResumes(sendResponse);
+        case "UPDATE_SETTINGS": {
+          const current = await getSettings();
+          const updated = { ...current, ...request.settings };
+          await chrome.storage.local.set({ "settings:preferences": updated });
+          sendResponse({ settings: updated });
+          break;
+        }
+
+        case "GET_RESUMES":
+          sendResponse({ resumes: await getCachedResumes() });
           break;
 
-        case 'SET_DEFAULT_RESUME':
-          handleSetDefaultResume(request, sendResponse);
+        case "SET_DEFAULT_RESUME": {
+          const resumes = await getCachedResumes();
+          const updated = resumes.map((r: any) => ({
+            ...r,
+            isDefault: r.id === request.resumeId,
+          }));
+          await chrome.storage.local.set({ "cache:resumes": updated });
+          sendResponse({ success: true });
+          break;
+        }
+
+        case "GET_ACTIVITY_LOG": {
+          const items = await chrome.storage.local.get(["activity:log"]);
+          const log = (items["activity:log"] ?? []) as unknown[];
+          sendResponse({ activities: log.slice(0, request.limit ?? 50) });
+          break;
+        }
+
+        case "LOG_ACTIVITY":
+          await handleLogActivity(request.payload, sender.tab?.id);
+          sendResponse({ success: true });
           break;
 
-        case 'GET_ACTIVITY_LOG':
-          handleGetActivityLog(request, sendResponse);
+        case "FIELD_MAP_REQUEST":
+          await handleFieldMapRequest(request.payload, sender.tab?.id);
+          sendResponse({ success: true });
           break;
 
-        case 'LOGOUT':
-          handleLogout(sendResponse);
+        case "LOGOUT":
+          await chrome.storage.local.remove(["session:token", "auth:user", "cache:resumes"]);
+          sendResponse({ success: true });
           break;
 
-        case 'DETECT_FORM':
-          handleDetectForm(sender, sendResponse);
+        case "OPEN_POPUP_TAB":
+          // Handled by popup itself via storage flag
+          await chrome.storage.local.set({ "popup:activeTab": request.payload });
+          sendResponse({ success: true });
           break;
 
         default:
-          sendResponse({ error: 'Unknown message type' });
+          sendResponse({ error: "Unknown message type" });
       }
-    } catch (error) {
-      console.error('Message handler error:', error);
-      sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (err) {
+      console.error("[ApplyFlow] Message handler error:", err);
+      sendResponse({ error: err instanceof Error ? err.message : "Unknown error" });
     }
   }
 
-  function handleGetAuthStatus(sendResponse: (response?: any) => void) {
-    chrome.storage.local.get(['session:token', 'auth:user', 'quota:usage'], (items: any) => {
-      sendResponse({
-        isLoggedIn: !!items['session:token'],
-        user: items['auth:user'],
-        quota: items['quota:usage'] ?? { used: 0, total: 50 },
-      });
-    });
+  // ── Auth helpers ─────────────────────────────────────────────────────────────
+
+  async function getAuthStatus() {
+    const items = await chrome.storage.local.get(["session:token", "auth:user", "quota:usage"]);
+    return {
+      isLoggedIn: !!items["session:token"],
+      user: items["auth:user"],
+      quota: items["quota:usage"] ?? { used: 0, total: 50 },
+    };
   }
 
-  function handleGetSettings(sendResponse: (response?: any) => void) {
-    chrome.storage.local.get(['settings:preferences'], (items: any) => {
-      sendResponse({
-        settings: items['settings:preferences'] ?? {
-          autoFill: false,
-          autoSubmit: false,
-          showOverlay: true,
-          soundEnabled: true,
+  async function getSession(): Promise<{
+    fullName?: string;
+    email?: string;
+    phone?: string;
+  } | null> {
+    const items = await chrome.storage.local.get(["auth:user"]);
+    return (items["auth:user"] as any) ?? null;
+  }
+
+  async function getAuthToken(): Promise<string | null> {
+    const items = await chrome.storage.local.get(["session:token"]);
+    return (items["session:token"] as string) ?? null;
+  }
+
+  // ── Settings ────────────────────────────────────────────────────────────────
+
+  async function getSettings() {
+    const items = await chrome.storage.local.get(["settings:preferences"]);
+    return (
+      (items["settings:preferences"] as object) ?? {
+        autoFill: false,
+        autoSubmit: false,
+        showOverlay: true,
+        soundEnabled: true,
+      }
+    );
+  }
+
+  // ── Resume cache ─────────────────────────────────────────────────────────────
+
+  async function getCachedResumes(): Promise<unknown[]> {
+    const items = await chrome.storage.local.get(["cache:resumes"]);
+    return (items["cache:resumes"] as unknown[]) ?? [];
+  }
+
+  // ── Activity logging ─────────────────────────────────────────────────────────
+
+  async function handleLogActivity(
+    payload: {
+      type: string;
+      url: string;
+      boardName?: string;
+      fieldsCount?: number;
+      timestamp: string;
+    },
+    tabId: number | undefined,
+  ) {
+    // 1. Append to local activity log (last 200 entries)
+    const items = await chrome.storage.local.get(["activity:log"]);
+    const log = ((items["activity:log"] as unknown[]) ?? []) as unknown[];
+    const entry = { ...payload, id: crypto.randomUUID(), tabId };
+    const updated = [entry, ...log].slice(0, 200);
+    await chrome.storage.local.set({ "activity:log": updated });
+
+    // 2. POST to web API to create/update the application record
+    const token = await getAuthToken();
+    if (!token) return;
+
+    try {
+      await fetch(`${APP_URL}/api/applications`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          source: payload.boardName?.toLowerCase().replace(/\s+/g, "") ?? "direct",
+          jobUrl: payload.url,
+          status: "applied",
+          appliedAt: payload.timestamp,
+          autofillFieldsCount: payload.fieldsCount ?? 0,
+        }),
       });
-    });
-  }
-
-  function handleUpdateSettings(request: MessageRequest, sendResponse: (response?: any) => void) {
-    chrome.storage.local.get(['settings:preferences'], (items: any) => {
-      const updated = { ...items['settings:preferences'], ...request.settings };
-      chrome.storage.local.set({ 'settings:preferences': updated }, () => {
-        sendResponse({ settings: updated });
-      });
-    });
-  }
-
-  function handleGetResumes(sendResponse: (response?: any) => void) {
-    chrome.storage.local.get(['cache:resumes'], (items: any) => {
-      sendResponse({ resumes: items['cache:resumes'] ?? [] });
-    });
-  }
-
-  function handleSetDefaultResume(request: MessageRequest, sendResponse: (response?: any) => void) {
-    chrome.storage.local.get(['cache:resumes'], (items: any) => {
-      const resumes = items['cache:resumes'] ?? [];
-      const updated = resumes.map((r: any) => ({
-        ...r,
-        isDefault: r.id === request.resumeId,
-      }));
-      chrome.storage.local.set({ 'cache:resumes': updated }, () => {
-        sendResponse({ success: true });
-      });
-    });
-  }
-
-  function handleGetActivityLog(request: MessageRequest, sendResponse: (response?: any) => void) {
-    chrome.storage.local.get(['activity:log'], (items: any) => {
-      const log = items['activity:log'] ?? [];
-      const limit = request.limit ?? 50;
-      sendResponse({ activities: log.slice(0, limit) });
-    });
-  }
-
-  function handleLogout(sendResponse: (response?: any) => void) {
-    chrome.storage.local.remove(['session:token', 'auth:user'], () => {
-      sendResponse({ success: true });
-    });
-  }
-
-  function handleDetectForm(sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
-    if (!sender.tab?.id) {
-      sendResponse({ status: 'empty' });
-      return;
+    } catch (err) {
+      console.warn("[ApplyFlow] Failed to sync activity to API:", err);
     }
-
-    // This would be implemented by the content script
-    sendResponse({ status: 'empty' });
   }
+
+  // ── LLM field-map proxy ───────────────────────────────────────────────────────
+
+  async function handleFieldMapRequest(
+    payload: { fields: { name: string; label: string }[] },
+    tabId: number | undefined,
+  ) {
+    if (!tabId) return;
+    const token = await getAuthToken();
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${APP_URL}/api/llm/field-map`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) return;
+      const mappings = (await res.json()) as Record<string, string>;
+
+      chrome.tabs.sendMessage(tabId, {
+        type: "FIELD_MAP_RESPONSE",
+        payload: mappings,
+      });
+    } catch (err) {
+      console.warn("[ApplyFlow] Field-map request failed:", err);
+    }
+  }
+
+  // ── Token refresh alarm (every 50 min) ──────────────────────────────────────
+
+  chrome.alarms.create("token-refresh", { periodInMinutes: 50 });
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== "token-refresh") return;
+    const token = await getAuthToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${APP_URL}/api/auth/session`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { token: newToken } = (await res.json()) as { token?: string };
+        if (newToken) {
+          await chrome.storage.local.set({ "session:token": newToken });
+        }
+      }
+    } catch {
+      // Silently ignore; next alarm will retry
+    }
+  });
 };
