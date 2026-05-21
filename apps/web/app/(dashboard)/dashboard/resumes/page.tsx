@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   query,
@@ -48,12 +48,18 @@ interface ResumeDoc {
 }
 
 function NewResumeDialog({
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
   onCreated,
 }: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onCreated: (id: string) => void;
 }): React.ReactElement {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -90,7 +96,7 @@ function NewResumeDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      <DialogTrigger>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
           New resume
@@ -124,7 +130,13 @@ function NewResumeDialog({
 export default function ResumesListPage(): React.ReactElement {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [resumes, setResumes] = useState<ResumeDoc[] | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") setDialogOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -154,6 +166,8 @@ export default function ResumesListPage(): React.ReactElement {
           </p>
         </div>
         <NewResumeDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
           onCreated={(id) => router.push(`/dashboard/resumes/${id}/edit`)}
         />
       </div>
@@ -213,7 +227,7 @@ export default function ResumesListPage(): React.ReactElement {
                   Edit
                 </Button>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuTrigger onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="sm" className="w-full">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
