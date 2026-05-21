@@ -386,6 +386,9 @@ export default defineContentScript({
       } else if (request.type === "FILL_FORM") {
         void fillForm(null);
         sendResponse({ success: true });
+      } else if (request.type === "SHOW_REVIEW_PANEL") {
+        showReviewPanel();
+        sendResponse({ success: true });
       } else if (request.type === "FIELD_MAP_RESPONSE") {
         // Background returns mapped values from the LLM proxy
         const mappings = request.payload as Record<string, string>;

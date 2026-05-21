@@ -100,10 +100,31 @@ export default function CurrentJobTab() {
         </div>
 
         <div className="flex gap-2">
-          <Button className="flex-1" size="sm">
+          <Button
+            className="flex-1"
+            size="sm"
+            onClick={async () => {
+              const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+              if (tab.id) {
+                await chrome.tabs.sendMessage(tab.id, { type: "FILL_FORM" });
+                window.close();
+              }
+            }}
+          >
             Fill form
           </Button>
-          <Button variant="outline" className="flex-1" size="sm">
+          <Button
+            variant="outline"
+            className="flex-1"
+            size="sm"
+            onClick={async () => {
+              const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+              if (tab.id) {
+                await chrome.tabs.sendMessage(tab.id, { type: "SHOW_REVIEW_PANEL" });
+                window.close();
+              }
+            }}
+          >
             Review
           </Button>
         </div>

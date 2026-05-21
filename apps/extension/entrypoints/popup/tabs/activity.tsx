@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 
 interface ActivityItem {
   id: string;
-  company: string;
-  role: string;
-  status: 'filled' | 'submitted' | 'queued' | 'failed';
-  timestamp: Date;
+  type?: string;
+  url?: string;
+  boardName?: string;
+  fieldsCount?: number;
+  status?: 'filled' | 'submitted' | 'queued' | 'failed';
+  timestamp: string;
 }
 
 export default function ActivityTab() {
@@ -61,18 +63,21 @@ export default function ActivityTab() {
   return (
     <div className="space-y-2">
       {activities.map((activity) => (
-        <div key={activity.id} className="p-3 bg-muted/50 rounded-lg space-y-2">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="font-medium text-sm">{activity.company}</p>
-              <p className="text-xs text-muted-foreground">{activity.role}</p>
+        <div key={activity.id} className="p-3 bg-muted/50 rounded-lg space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{activity.boardName ?? "Job board"}</p>
+              {activity.url && (
+                <p className="text-xs text-muted-foreground truncate">{activity.url}</p>
+              )}
             </div>
-            <span className={`text-xs font-medium px-2 py-1 rounded ${getStatusColor(activity.status)}`}>
-              {activity.status}
+            <span className={`text-xs font-medium px-2 py-0.5 rounded shrink-0 ${getStatusColor(activity.status ?? 'filled')}`}>
+              {activity.type ?? "fill"}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {activity.timestamp.toLocaleTimeString()}
+            {new Date(activity.timestamp).toLocaleString()}
+            {activity.fieldsCount ? ` · ${activity.fieldsCount} fields` : ""}
           </p>
         </div>
       ))}

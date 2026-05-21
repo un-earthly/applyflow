@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../components/button';
 
+const APP_URL = import.meta.env.VITE_APP_URL ?? "https://app.applyflow.io";
+
 export default function HomeTab() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function HomeTab() {
         <Button
           className="w-full"
           onClick={() => {
-            chrome.tabs.create({ url: 'http://localhost:3000/login?return=extension' });
+            chrome.tabs.create({ url: `${APP_URL}/login?return=extension` });
           }}
         >
           Sign in
@@ -73,14 +75,14 @@ export default function HomeTab() {
         <Button
           variant="outline"
           className="w-full justify-start text-sm"
-          onClick={() => chrome.tabs.create({ url: 'http://localhost:3000/dashboard/jobs' })}
+          onClick={() => chrome.tabs.create({ url: `${APP_URL}/dashboard/jobs` })}
         >
           Browse recommended jobs
         </Button>
         <Button
           variant="outline"
           className="w-full justify-start text-sm"
-          onClick={() => chrome.tabs.create({ url: 'http://localhost:3000/dashboard/applications' })}
+          onClick={() => chrome.tabs.create({ url: `${APP_URL}/dashboard/applications` })}
         >
           View applications
         </Button>
