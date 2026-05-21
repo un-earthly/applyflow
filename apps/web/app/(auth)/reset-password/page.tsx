@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { verifyPasswordResetCode, confirmPasswordReset } from "firebase/auth";
@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2 } from "lucide-react";
 
-export default function ResetPasswordPage(): React.ReactElement {
+function ResetPasswordForm(): React.ReactElement {
   const params = useSearchParams();
   const router = useRouter();
   const oobCode = params.get("oobCode") ?? "";
@@ -90,5 +90,13 @@ export default function ResetPasswordPage(): React.ReactElement {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function ResetPasswordPage(): React.ReactElement {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p className="text-muted-foreground text-sm">Loading…</p></div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
