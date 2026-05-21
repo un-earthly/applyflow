@@ -17,6 +17,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
+    "@react-pdf/renderer": "^4.5.1",
     "@repo/shared": "workspace:^",
     "@repo/ui": "workspace:*",
     "@sentry/nextjs": "^10.53.1",
