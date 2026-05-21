@@ -14,6 +14,8 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
+  updateProfile,
+  sendEmailVerification,
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
@@ -22,7 +24,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -66,8 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     await syncSession(cred.user);
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, displayName?: string) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
+    if (displayName) {
+      await updateProfile(cred.user, { displayName });
+    }
+    await sendEmailVerification(cred.user);
     await syncSession(cred.user);
   };
 
