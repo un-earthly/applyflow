@@ -66,14 +66,13 @@ export default function JobDetailPage(): React.ReactElement {
     if (!job?.url) return;
     window.open(job.url, "_blank");
     if (user) {
-      await addDoc(collection(db, "applications"), {
-        userId: user.uid,
+      await addDoc(collection(db, "users", user.uid, "applications"), {
         company: job.company,
         role: job.title,
         url: job.url,
         source: job.source,
         status: "applied",
-        appliedAt: new Date(),
+        appliedAt: new Date().toISOString(),
       });
     }
   };
