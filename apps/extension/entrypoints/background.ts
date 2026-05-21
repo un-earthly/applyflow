@@ -170,7 +170,7 @@ export default () => {
         },
         body: JSON.stringify({
           source: payload.boardName?.toLowerCase().replace(/\s+/g, "") ?? "direct",
-          jobUrl: payload.url,
+          url: payload.url,
           status: "applied",
           appliedAt: payload.timestamp,
           autofillFieldsCount: payload.fieldsCount ?? 0,
