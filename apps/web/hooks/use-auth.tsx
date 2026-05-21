@@ -51,17 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
       setUser(u);
       setLoading(false);
       if (u) {
-<<<<<<< HEAD
-        document.cookie = "__session=1; path=/; SameSite=Lax; max-age=2592000";
-      } else {
-        document.cookie = "__session=; path=/; max-age=0";
-=======
         try {
           await syncSession(u);
         } catch (e) {
           console.error("Session sync failed:", e);
         }
->>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
       }
     });
     return unsubscribe;

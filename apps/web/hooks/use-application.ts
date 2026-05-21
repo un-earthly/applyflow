@@ -3,28 +3,28 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   doc,
-  getDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
-  type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { useAuth } from "./use-auth";
 import type { Application, UpdateApplicationInput } from "@repo/shared";
 
 export function useApplication(id: string | undefined) {
+  const { user } = useAuth();
   const [application, setApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) {
+    if (!id || !user) {
       setApplication(null);
       setLoading(false);
       return;
     }
 
     const unsubscribe = onSnapshot(
-      doc(db, "applications", id),
+      doc(db, "users", user.uid, "applications", id),
       (docSnap) => {
         if (docSnap.exists()) {
           setApplication({ id: docSnap.id, ...docSnap.data() } as Application);
@@ -40,23 +40,23 @@ export function useApplication(id: string | undefined) {
     );
 
     return unsubscribe;
-  }, [id]);
+  }, [id, user]);
 
   const update = useCallback(
     async (data: UpdateApplicationInput) => {
-      if (!id) return;
-      await updateDoc(doc(db, "applications", id), {
+      if (!id || !user) return;
+      await updateDoc(doc(db, "users", user.uid, "applications", id), {
         ...data,
         updatedAt: new Date().toISOString(),
       });
     },
-    [id]
+    [id, user]
   );
 
   const remove = useCallback(async () => {
-    if (!id) return;
-    await deleteDoc(doc(db, "applications", id));
-  }, [id]);
+    if (!id || !user) return;
+    await deleteDoc(doc(db, "users", user.uid, "applications", id));
+  }, [id, user]);
 
   return { application, loading, update, remove };
 }

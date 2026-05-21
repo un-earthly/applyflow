@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   collection,
   query,
-  where,
   orderBy,
   onSnapshot,
   type QuerySnapshot,
@@ -27,8 +26,7 @@ export function useApplications() {
     }
 
     const q = query(
-      collection(db, "applications"),
-      where("userId", "==", user.uid),
+      collection(db, "users", user.uid, "applications"),
       orderBy("appliedAt", "desc")
     );
 
