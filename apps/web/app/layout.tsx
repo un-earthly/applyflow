@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AnalyticsProvider } from "@/components/analytics-provider";
 import "./globals.css";
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className="antialiased">
         <AuthProvider>
           <AnalyticsProvider>{children}</AnalyticsProvider>
+          <Toaster position="top-right" richColors />
         </AuthProvider>
       </body>
     </html>

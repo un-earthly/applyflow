@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
@@ -11,7 +12,7 @@ export default function AdminError({
   error: Error & { digest?: string };
   reset: () => void;
 }): React.ReactElement {
-  useEffect(() => { console.error(error); }, [error]);
+  useEffect(() => { Sentry.captureException(error); }, [error]);
 
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">

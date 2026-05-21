@@ -27,12 +27,13 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState>({ uid: null, email: null, displayName: null, loading: true });
 
   useEffect(() => {
-    browser.storage.local.get(["userProfile"]).then((data) => {
-      const profile = data.userProfile as { uid?: string; email?: string; displayName?: string } | undefined;
+    browser.storage.local.get(["auth:user", "session:token"]).then((data) => {
+      const profile = data["auth:user"] as { uid?: string; email?: string; displayName?: string; fullName?: string } | undefined;
+      const hasToken = !!data["session:token"];
       setAuth({
-        uid: profile?.uid ?? null,
+        uid: hasToken ? (profile?.uid ?? null) : null,
         email: profile?.email ?? null,
-        displayName: profile?.displayName ?? null,
+        displayName: profile?.displayName ?? profile?.fullName ?? null,
         loading: false,
       });
     });

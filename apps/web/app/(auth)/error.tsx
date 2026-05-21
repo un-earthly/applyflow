@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { EmptyState } from "@/components/shared";
 import { AlertTriangle } from "lucide-react";
 
@@ -12,7 +13,7 @@ export default function AuthError({
   reset: () => void;
 }): React.ReactElement {
   useEffect(() => {
-    console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

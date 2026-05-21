@@ -19,6 +19,7 @@
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@repo/shared": "workspace:^",
     "@repo/ui": "workspace:*",
+    "@sentry/nextjs": "^10.53.1",
     "@tailwindcss/postcss": "^4.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
