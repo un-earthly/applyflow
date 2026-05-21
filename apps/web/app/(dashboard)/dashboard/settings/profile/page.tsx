@@ -54,7 +54,7 @@ export default function ProfileSettingsPage(): React.ReactElement {
       await updateProfile(auth.currentUser!, { displayName: form.displayName });
       await setDoc(
         doc(db, "profiles", user.uid),
-        { ...form, updatedAt: new Date() },
+        { ...form, fullName: form.displayName, updatedAt: new Date() },
         { merge: true },
       );
       setSaved(true);

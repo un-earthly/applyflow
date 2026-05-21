@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const token = request.headers.get("authorization")?.slice(7);
+  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const decoded = await adminAuth().verifyIdToken(token);
+    const newToken = await adminAuth().createCustomToken(decoded.uid);
+    return NextResponse.json({ token: newToken });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { idToken } = await request.json();

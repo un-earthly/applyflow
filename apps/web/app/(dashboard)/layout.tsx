@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -87,9 +89,23 @@ function NavLink({
   );
 }
 
+const PLAN_LIMITS: Record<string, { label: string; autofills: string }> = {
+  free: { label: "Free plan", autofills: "10 autofills / month" },
+  pro: { label: "Pro plan", autofills: "Unlimited autofills" },
+  teams: { label: "Teams plan", autofills: "Unlimited autofills" },
+};
+
 function SidebarContent(): React.ReactElement {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const [tier, setTier] = useState<string>("free");
+
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(doc(db, "profiles", user.uid), (snap) => {
+      if (snap.exists()) setTier(snap.data().subscriptionTier ?? "free");
+    });
+  }, [user]);
 
   const initials = user?.displayName
     ? user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase()
@@ -121,11 +137,13 @@ function SidebarContent(): React.ReactElement {
       <Separator />
       <div className="p-3">
         <div className="mb-2 rounded-lg border bg-muted/30 p-3 text-xs">
-          <p className="font-medium">Free plan</p>
-          <p className="text-muted-foreground mt-0.5">10 autofills / month</p>
-          <Button size="sm" className="mt-2 w-full" onClick={() => router.push("/dashboard/settings/billing")}>
-            Upgrade to Pro
-          </Button>
+          <p className="font-medium capitalize">{PLAN_LIMITS[tier]?.label ?? "Free plan"}</p>
+          <p className="text-muted-foreground mt-0.5">{PLAN_LIMITS[tier]?.autofills ?? "10 autofills / month"}</p>
+          {tier === "free" && (
+            <Button size="sm" className="mt-2 w-full" onClick={() => router.push("/dashboard/settings/billing")}>
+              Upgrade to Pro
+            </Button>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-muted transition-colors outline-none">
