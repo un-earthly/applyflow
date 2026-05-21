@@ -6,9 +6,9 @@ import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Globe, Loader2 } from "lucide-react";
+import { CheckCircle2, Chrome, Loader2 } from "lucide-react";
 
-const EXTENSION_ID = "applyflow-extension";
+const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? "applyflow-extension";
 
 function detectExtension(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -58,7 +58,7 @@ export default function InstallExtensionPage(): React.ReactElement {
           Install the browser extension
         </h1>
         <p className="text-muted-foreground text-sm">
-          The Globe extension is how ApplyFlow fills job applications
+          The Chrome extension is how ApplyFlow fills job applications
           automatically on any site.
         </p>
       </div>
@@ -78,16 +78,16 @@ export default function InstallExtensionPage(): React.ReactElement {
           </>
         ) : (
           <>
-            <Globe className="text-muted-foreground mx-auto h-12 w-12" />
+            <Chrome className="text-muted-foreground mx-auto h-12 w-12" />
             <div>
               <p className="font-medium">Not yet installed</p>
               <p className="text-muted-foreground text-sm">
-                Add the extension from the Globe Web Store.
+                Add the extension from the Chrome Web Store.
               </p>
             </div>
             <Button size="lg" className="w-full max-w-xs">
-              <Globe className="mr-2 h-4 w-4" />
-              Add to Globe
+              <Chrome className="mr-2 h-4 w-4" />
+              Add to Chrome
             </Button>
           </>
         )}
