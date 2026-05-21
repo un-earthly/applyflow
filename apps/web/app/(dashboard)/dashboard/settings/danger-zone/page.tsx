@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase/client";
-import { collection, query, where, getDocs, deleteDoc, doc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, writeBatch, query, where } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,9 +28,17 @@ export default function DangerZonePage(): React.ReactElement {
   const [confirmEmail, setConfirmEmail] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const wipeCollection = async (collectionName: string) => {
+  const wipeSubcollection = async (subcollectionName: string) => {
     if (!user) return;
-    const q = query(collection(db, collectionName), where("userId", "==", user.uid));
+    const snap = await getDocs(collection(db, "users", user.uid, subcollectionName));
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  };
+
+  const wipeCoverLetters = async () => {
+    if (!user) return;
+    const q = query(collection(db, "coverLetters"), where("userId", "==", user.uid));
     const snap = await getDocs(q);
     const batch = writeBatch(db);
     snap.docs.forEach((d) => batch.delete(d.ref));
@@ -41,10 +49,9 @@ export default function DangerZonePage(): React.ReactElement {
     if (!user || confirmEmail !== user.email) return;
     setDeleting(true);
     try {
-      await wipeCollection("applications");
-      await wipeCollection("resumes");
-      await wipeCollection("coverLetters");
-      await wipeCollection("savedJobs");
+      await wipeSubcollection("applications");
+      await wipeSubcollection("resumes");
+      await wipeCoverLetters();
       await deleteDoc(doc(db, "profiles", user.uid));
       await user.delete();
       await signOut();
@@ -58,13 +65,13 @@ export default function DangerZonePage(): React.ReactElement {
     {
       label: "Wipe all applications",
       description: "Permanently delete all application records. This cannot be undone.",
-      action: () => wipeCollection("applications"),
+      action: () => wipeSubcollection("applications"),
       confirmLabel: "Delete all applications",
     },
     {
       label: "Wipe all resumes",
       description: "Permanently delete all resumes. This cannot be undone.",
-      action: () => wipeCollection("resumes"),
+      action: () => wipeSubcollection("resumes"),
       confirmLabel: "Delete all resumes",
     },
   ];
