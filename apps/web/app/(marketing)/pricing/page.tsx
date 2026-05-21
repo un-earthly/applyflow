@@ -1,103 +1,147 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Minus } from "lucide-react";
+import { Check } from "lucide-react";
+import { PLANS } from "@/lib/stripe";
 
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    description: "Get started with AI autofill.",
-    cta: "Start free",
-    href: "/signup",
-    highlighted: false,
-    features: [
-      { label: "10 autofills / month", included: true },
-      { label: "1 resume", included: true },
-      { label: "Basic templates", included: true },
-      { label: "Application tracker", included: true },
-      { label: "AI resume tailoring", included: false },
-      { label: "Advanced analytics", included: false },
-      { label: "Priority support", included: false },
-    ],
-  },
-  {
-    name: "Pro",
-    price: "$12",
-    description: "For active job seekers.",
-    cta: "Start Pro",
-    href: "/signup?plan=pro",
-    highlighted: true,
-    features: [
-      { label: "Unlimited autofills", included: true },
-      { label: "5 resumes", included: true },
-      { label: "All templates", included: true },
-      { label: "Application tracker", included: true },
-      { label: "AI resume tailoring", included: true },
-      { label: "Advanced analytics", included: true },
-      { label: "Priority support", included: false },
-    ],
-  },
-  {
-    name: "Teams",
-    price: "$29",
-    description: "Per user, for recruiting teams.",
-    cta: "Start Teams",
-    href: "/signup?plan=teams",
-    highlighted: false,
-    features: [
-      { label: "Unlimited autofills", included: true },
-      { label: "Unlimited resumes", included: true },
-      { label: "All templates", included: true },
-      { label: "Application tracker", included: true },
-      { label: "AI resume tailoring", included: true },
-      { label: "Advanced analytics", included: true },
-      { label: "Priority support", included: true },
-    ],
-  },
-];
+export default function PricingPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState<string | null>(null);
 
-export default function PricingPage(): React.ReactElement {
+  const handleSubscribe = async (planId: string) => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    setLoading(planId);
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      });
+
+      if (!response.ok) throw new Error("Failed to create checkout session");
+
+      const { url } = await response.json();
+      if (url) window.location.href = url;
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-20 md:px-6">
-      <div className="mb-16 text-center">
-        <h1 className="mb-4 text-4xl font-bold">Simple, transparent pricing</h1>
-        <p className="text-muted-foreground text-lg">Start free. Upgrade when you need more.</p>
-      </div>
-      <div className="grid gap-6 md:grid-cols-3">
-        {plans.map((plan) => (
-          <Card key={plan.name} className={plan.highlighted ? "border-primary shadow-lg ring-2 ring-primary" : ""}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{plan.name}</CardTitle>
-                {plan.highlighted && <Badge>Most popular</Badge>}
-              </div>
-              <div className="mt-2">
-                <span className="text-4xl font-bold">{plan.price}</span>
-                {plan.price !== "$0" && <span className="text-muted-foreground text-sm">/mo</span>}
-              </div>
-              <CardDescription>{plan.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full" variant={plan.highlighted ? "default" : "outline"} render={<Link href={plan.href} />}>
-                {plan.cta}
-              </Button>
-              <ul className="space-y-2">
-                {plan.features.map((f) => (
-                  <li key={f.label} className="flex items-center gap-2 text-sm">
-                    {f.included ? (
-                      <CheckCircle2 className="text-primary h-4 w-4 shrink-0" />
-                    ) : (
-                      <Minus className="text-muted-foreground h-4 w-4 shrink-0" />
-                    )}
-                    <span className={f.included ? "" : "text-muted-foreground"}>{f.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="min-h-screen py-20 px-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-xl text-muted-foreground">
+            Choose the plan that fits your job search needs
+          </p>
+        </div>
+
+        {/* Plans Grid */}
+        <div className="grid md:grid-cols-3 gap-8">
+          {PLANS.map((plan) => (
+            <Card
+              key={plan.id}
+              className={plan.id === "pro" ? "border-primary md:scale-105" : ""}
+            >
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{plan.name}</CardTitle>
+                  {plan.id === "pro" && (
+                    <Badge>Most Popular</Badge>
+                  )}
+                </div>
+                <CardDescription>
+                  {plan.interval === "forever" ? (
+                    <span>Free forever</span>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-foreground">
+                        ${plan.price}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        / {plan.interval === "year" ? "year" : "month"}
+                      </span>
+                    </>
+                  )}
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent>
+                <ul className="space-y-3">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-3">
+                      <Check className="h-5 w-5 text-green-600" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+
+              <CardFooter>
+                {plan.id === "free" ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    Current Plan
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={() => handleSubscribe(plan.id)}
+                    disabled={loading === plan.id}
+                  >
+                    {loading === plan.id ? "Processing..." : "Get Started"}
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+
+        {/* FAQ */}
+        <div className="mt-20 max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold mb-8 text-center">FAQ</h2>
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold mb-2">Can I cancel anytime?</h3>
+              <p className="text-muted-foreground">
+                Yes, you can cancel your subscription at any time. No questions asked.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Do you offer refunds?</h3>
+              <p className="text-muted-foreground">
+                We offer a 7-day money-back guarantee if you're not satisfied.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Is there a free trial?</h3>
+              <p className="text-muted-foreground">
+                Start with our free plan to try all features. Upgrade anytime.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

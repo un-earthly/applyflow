@@ -1,6 +1,20 @@
 import { defineConfig } from 'wxt';
 
-// See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  manifest: {
+    name: 'ApplyFlow',
+    description: 'AI-powered job application assistant',
+    permissions: ['storage', 'tabs'],
+    host_permissions: ['<all_urls>'],
+  },
+  vite: () => ({
+    build: {
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: false,
+        },
+      },
+    },
+  }),
 });

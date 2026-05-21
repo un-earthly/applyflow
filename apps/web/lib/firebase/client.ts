@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -18,3 +18,8 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Connect to Firebase Auth Emulator in development
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+}
