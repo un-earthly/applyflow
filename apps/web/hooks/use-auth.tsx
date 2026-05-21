@@ -29,37 +29,63 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function syncSession(user: User | null): Promise<void> {
+  if (!user) {
+    await fetch("/api/auth/session", { method: "DELETE" });
+    return;
+  }
+  const idToken = await user.getIdToken(true);
+  await fetch("/api/auth/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setLoading(false);
       if (u) {
+<<<<<<< HEAD
         document.cookie = "__session=1; path=/; SameSite=Lax; max-age=2592000";
       } else {
         document.cookie = "__session=; path=/; max-age=0";
+=======
+        try {
+          await syncSession(u);
+        } catch (e) {
+          console.error("Session sync failed:", e);
+        }
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
       }
     });
     return unsubscribe;
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await syncSession(cred.user);
   };
 
   const signUp = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await syncSession(cred.user);
   };
 
   const signInWithGoogle = async () => {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+    await syncSession(cred.user);
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    await syncSession(null);
+    window.location.href = "/login";
   };
 
   return (

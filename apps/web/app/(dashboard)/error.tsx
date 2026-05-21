@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+<<<<<<< HEAD
 import { Button } from "@/components/ui/button";
+=======
+import { EmptyState } from "@/components/shared";
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
 import { AlertTriangle } from "lucide-react";
 
 export default function DashboardError({
@@ -11,6 +15,7 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }): React.ReactElement {
+<<<<<<< HEAD
   useEffect(() => { console.error(error); }, [error]);
 
   return (
@@ -23,6 +28,20 @@ export default function DashboardError({
         An error occurred loading this page.
       </p>
       <Button className="mt-6" onClick={reset}>Try again</Button>
+=======
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-12">
+      <EmptyState
+        icon={AlertTriangle}
+        title="Something went wrong"
+        description="We could not load the dashboard. Please try again."
+        action={{ label: "Try again", onClick: reset }}
+      />
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
     </div>
   );
 }

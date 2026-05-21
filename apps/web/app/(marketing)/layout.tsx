@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { AppLogo } from "@/components/shared";
 
 function MarketingNav(): React.ReactElement {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
-        <Link href="/" className="text-lg font-semibold">
-          ApplyFlow
-        </Link>
+        <AppLogo />
         <nav className="hidden items-center gap-6 text-sm md:flex">
           <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
           <Link href="/#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</Link>
@@ -32,7 +31,7 @@ function MarketingFooter(): React.ReactElement {
       <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="text-lg font-semibold">ApplyFlow</Link>
+            <AppLogo />
             <p className="text-muted-foreground mt-2 text-sm">AI-powered job application automation.</p>
           </div>
           <div>

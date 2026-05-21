@@ -4,6 +4,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: 'ApplyFlow',
+<<<<<<< HEAD
     description: 'Autofill job applications in seconds. Track your progress. Land faster.',
     permissions: [
       'storage',
@@ -32,4 +33,19 @@ export default defineConfig({
       },
     },
   },
+=======
+    description: 'AI-powered job application assistant',
+    permissions: ['storage', 'tabs'],
+    host_permissions: ['<all_urls>'],
+  },
+  vite: () => ({
+    build: {
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: false,
+        },
+      },
+    },
+  }),
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
 });

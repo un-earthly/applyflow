@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
+=======
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -18,6 +25,7 @@ let _auth: Auth | undefined;
 let _db: Firestore | undefined;
 let _storage: FirebaseStorage | undefined;
 
+<<<<<<< HEAD
 function getClientApp(): FirebaseApp {
   if (!_app) {
     _app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -58,3 +66,13 @@ export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
     return Reflect.get(getClientStorage(), prop);
   },
 });
+=======
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+// Connect to Firebase Auth Emulator in development
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+}
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef

@@ -2,9 +2,16 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+<<<<<<< HEAD
 import { AlertTriangle } from "lucide-react";
 
 export default function GlobalError({
+=======
+import { EmptyState } from "@/components/shared";
+import { AlertTriangle } from "lucide-react";
+
+export default function RootError({
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
   error,
   reset,
 }: {
@@ -16,6 +23,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
+<<<<<<< HEAD
     <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
         <AlertTriangle className="h-8 w-8 text-destructive" />
@@ -39,6 +47,15 @@ export default function GlobalError({
           Report bug
         </Button>
       </div>
+=======
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <EmptyState
+        icon={AlertTriangle}
+        title="Something went wrong"
+        description={error.message || "An unexpected error occurred. Please try again."}
+        action={{ label: "Try again", onClick: reset }}
+      />
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
     </div>
   );
 }

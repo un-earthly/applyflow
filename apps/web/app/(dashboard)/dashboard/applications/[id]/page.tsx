@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+<<<<<<< HEAD
 import {
   doc,
   onSnapshot,
@@ -22,6 +23,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+=======
+import { doc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase/client";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
 import {
   Select,
   SelectContent,
@@ -30,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+<<<<<<< HEAD
   ArrowLeft,
   ExternalLink,
   MoreHorizontal,
@@ -125,21 +141,99 @@ export default function ApplicationDetailPage(): React.ReactElement {
       <div className="mx-auto max-w-3xl space-y-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-48 w-full rounded-xl" />
+=======
+  Textarea,
+} from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
+
+interface Application {
+  id: string;
+  company: string;
+  role: string;
+  status: "applied" | "interviewing" | "offered" | "rejected" | "accepted";
+  url?: string;
+  notes?: string;
+  appliedAt: { seconds: number };
+}
+
+export default function ApplicationDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { user } = useAuth();
+  const [application, setApplication] = useState<Application | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    if (!user || !params.id) return;
+
+    const unsubscribe = onSnapshot(
+      doc(db, "users", user.uid, "applications", params.id as string),
+      (snap) => {
+        if (snap.exists()) {
+          const data = { id: snap.id, ...snap.data() } as Application;
+          setApplication(data);
+          setNotes(data.notes || "");
+          setStatus(data.status);
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, params.id]);
+
+  const handleSave = async () => {
+    if (!user || !params.id || !application) return;
+    setSaving(true);
+    try {
+      await updateDoc(
+        doc(db, "users", user.uid, "applications", params.id as string),
+        {
+          notes,
+          status,
+          updatedAt: serverTimestamp(),
+        }
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto py-10">
+        <Skeleton className="h-8 w-40 mb-6" />
+        <Skeleton className="h-96 w-full" />
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
       </div>
     );
   }
 
+<<<<<<< HEAD
   if (app === null) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="font-medium">Application not found</p>
         <Button className="mt-4" onClick={() => router.push("/dashboard/applications")}>
           Back to applications
+=======
+  if (!application) {
+    return (
+      <div className="max-w-4xl mx-auto py-10">
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
         </Button>
       </div>
     );
   }
 
+<<<<<<< HEAD
   const statusCfg = STATUS_CONFIG[app.status];
 
   return (
@@ -256,6 +350,98 @@ export default function ApplicationDetailPage(): React.ReactElement {
           rows={8}
         />
       </div>
+=======
+  return (
+    <div className="max-w-4xl mx-auto py-10">
+      <div className="flex items-center gap-4 mb-8">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold">{application.role}</h1>
+          <p className="text-muted-foreground">{application.company}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Application Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="applied">Applied</SelectItem>
+                    <SelectItem value="interviewing">Interviewing</SelectItem>
+                    <SelectItem value="offered">Offered</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notes */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notes</CardTitle>
+              <CardDescription>Add notes about this application</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="Interview feedback, follow-up reminders, etc."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={6}
+              />
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Applied</p>
+                <p className="font-medium">
+                  {new Date(application.appliedAt.seconds * 1000).toLocaleDateString()}
+                </p>
+              </div>
+              {application.url && (
+                <div>
+                  <p className="text-muted-foreground mb-2">Job Posting</p>
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <a href={application.url} target="_blank" rel="noopener noreferrer">
+                      View <ExternalLink className="h-3 w-3 ml-2" />
+                    </a>
+                  </Button>
+                </div>
+              )}
+              <Button variant="destructive" size="sm" className="w-full">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
     </div>
   );
 }

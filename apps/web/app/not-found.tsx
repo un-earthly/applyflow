@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,20 @@ export default function NotFound(): React.ReactElement {
         <Button render={<Link href="/" />}>Go home</Button>
         <Button variant="outline" render={<Link href="/dashboard" />}>Dashboard</Button>
       </div>
+=======
+import { EmptyState } from "@/components/shared";
+import { Search } from "lucide-react";
+
+export default function NotFound(): React.ReactElement {
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <EmptyState
+        icon={Search}
+        title="Page not found"
+        description="The page you are looking for does not exist or has been moved."
+        action={{ label: "Go home", onClick: () => (window.location.href = "/") }}
+      />
+>>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
     </div>
   );
 }
