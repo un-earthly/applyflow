@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '../components/button';
 import { ChevronRight } from 'lucide-react';
 
+const APP_URL = import.meta.env.VITE_APP_URL ?? "https://app.applyflow.io";
+
 interface Settings {
   autoFill: boolean;
   autoSubmit: boolean;
@@ -123,7 +125,7 @@ export default function SettingsTab() {
           variant="outline"
           className="w-full justify-between"
           onClick={() => {
-            window.open('http://localhost:3000/dashboard/settings');
+            chrome.tabs.create({ url: `${APP_URL}/dashboard/settings` });
             window.close();
           }}
         >
