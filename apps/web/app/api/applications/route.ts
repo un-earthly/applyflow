@@ -18,7 +18,7 @@ const applicationSchema = z.object({
   notes: z.string().max(10000).optional(),
   appliedAt: z.string().datetime().optional(),
   autofillFieldsCount: z.number().optional(),
-  formSnapshot: z.record(z.string()).optional(),
+  formSnapshot: z.record(z.string(), z.string()).optional(),
 });
 
 async function getUid(req: NextRequest): Promise<string | null> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +55,7 @@ export default function AnalyticsPage(): React.ReactElement {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "applications"), where("userId", "==", user.uid));
+    const q = collection(db, "users", user.uid, "applications");
     getDocs(q).then((snap) => {
       const apps = snap.docs.map((d) => d.data() as { status: AppStatus });
       const byStatus = {
