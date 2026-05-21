@@ -44,7 +44,7 @@ const NAV_GROUPS = [
   {
     label: "Library",
     items: [
-      { href: "/dashboard/resume", label: "Resumes", icon: FileText },
+      { href: "/dashboard/resumes", label: "Resumes", icon: FileText },
       { href: "/dashboard/cover-letters", label: "Cover Letters", icon: Mail },
       { href: "/dashboard/jobs", label: "Jobs", icon: BookmarkCheck },
     ],
