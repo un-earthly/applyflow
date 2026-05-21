@@ -13,6 +13,7 @@ const SETTINGS_NAV = [
   { href: "/dashboard/settings/job-preferences", label: "Job preferences" },
   { href: "/dashboard/settings/privacy", label: "Privacy" },
   { href: "/dashboard/settings/api-keys", label: "API keys" },
+  { href: "/dashboard/settings/team", label: "Team" },
   { href: "/dashboard/settings/danger-zone", label: "Danger zone" },
 ];
 
@@ -37,7 +38,7 @@ export default function SettingsLayout({
                 href={item.href}
                 className={cn(
                   "block rounded-md px-3 py-2 text-sm transition-colors",
-                  pathname === item.href || (item.href === "/dashboard/settings/billing" && pathname.startsWith("/dashboard/settings/billing"))
+                  pathname === item.href || (item.href === "/dashboard/settings/billing" && pathname.startsWith("/dashboard/settings/billing")) || (item.href === "/dashboard/settings/team" && pathname.startsWith("/dashboard/settings/team"))
                     ? "bg-muted font-medium"
                     : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                 )}
