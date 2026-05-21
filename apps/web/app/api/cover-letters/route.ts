@@ -4,6 +4,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { parseBody } from "@/lib/api-validate";
+import OpenAI from "openai";
 
 const coverLetterCreateSchema = z.object({
   company: z.string().max(200).optional(),
@@ -22,6 +23,8 @@ async function getUid(req: NextRequest): Promise<string | null> {
     return null;
   }
 }
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const uid = await getUid(req);
@@ -45,8 +48,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if ("error" in parsed) return parsed.error;
   const { company, role, jd, resumeId } = parsed.data;
 
-  // In production, generate with OpenAI using the resume content + JD
-  const content = `Dear Hiring Manager,\n\nI am excited to apply for the ${role ?? "position"} role at ${company ?? "your company"}.\n\n[AI-generated content will appear here in production]\n\nBest regards`;
+  let resumeContent = "";
+  if (resumeId) {
+    const snap = await adminDb().collection("resumes").doc(resumeId).get();
+    if (snap.exists && snap.data()!.userId === uid) {
+      resumeContent = JSON.stringify(snap.data()!.content ?? {});
+    }
+  } else {
+    const profileSnap = await adminDb().collection("profiles").doc(uid).get();
+    const p = profileSnap.data() ?? {};
+    resumeContent = `Name: ${p.fullName ?? ""}\nEmail: ${p.email ?? ""}\nPhone: ${p.phone ?? ""}\nLocation: ${p.location ?? ""}`;
+  }
+
+  let content = `Dear Hiring Manager,\n\nI am excited to apply for the ${role ?? "position"} role at ${company ?? "your company"}.\n\n[Customize this cover letter to highlight your experience.]\n\nBest regards,\n`;
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const systemPrompt = `You are a professional cover letter writer. Write a concise, compelling cover letter (3–4 paragraphs, under 350 words) tailored to the job description and candidate profile. Use a professional tone. Address it to "Dear Hiring Manager". End with "Best regards," followed by a blank line for the signature.`;
+      const userPrompt = `Company: ${company ?? "the company"}\nRole: ${role ?? "the position"}\n\nJob Description:\n${jd ?? "(not provided)"}\n\nCandidate Profile:\n${resumeContent}`;
+
+      const completion = await openai.chat.completions.create({
+        model: process.env.AI_TAILOR_MODEL ?? "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 700,
+      });
+
+      content = completion.choices[0]?.message?.content ?? content;
+    } catch {
+      // fall through to placeholder
+    }
+  }
 
   const ref = await adminDb().collection("coverLetters").add({
     userId: uid,
