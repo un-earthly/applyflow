@@ -23,7 +23,8 @@ export default function InvoicesPage(): React.ReactElement {
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/stripe/invoices")
+    user.getIdToken()
+      .then((token) => fetch("/api/stripe/invoices", { headers: { Authorization: `Bearer ${token}` } }))
       .then((r) => r.json())
       .then((data) => setInvoices((data as { invoices: Invoice[] }).invoices ?? []))
       .catch(() => setInvoices([]));

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Pencil } from "lucide-react";
@@ -30,14 +31,15 @@ interface ResumeData {
 export default function ResumePreviewPage(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const [resume, setResume] = useState<ResumeData | null>(null);
 
   useEffect(() => {
-    if (!id) return;
-    return onSnapshot(doc(db, "resumes", id), (snap) => {
+    if (!id || !user) return;
+    return onSnapshot(doc(db, "users", user.uid, "resumes", id), (snap) => {
       if (snap.exists()) setResume(snap.data() as ResumeData);
     });
-  }, [id]);
+  }, [id, user]);
 
   if (!resume) {
     return (

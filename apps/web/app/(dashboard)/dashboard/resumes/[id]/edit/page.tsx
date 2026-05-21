@@ -481,21 +481,21 @@ export default function ResumeEditPage(): React.ReactElement {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!id) return;
-    return onSnapshot(doc(db, "resumes", id), (snap) => {
-      if (!snap.exists()) { router.replace("/dashboard/resume"); return; }
+    if (!id || !user) return;
+    return onSnapshot(doc(db, "users", user.uid, "resumes", id), (snap) => {
+      if (!snap.exists()) { router.replace("/dashboard/resumes"); return; }
       const d = snap.data();
       setResumeName(d.name as string);
       setData(d.jsonData as JsonData);
     });
-  }, [id, router]);
+  }, [id, user, router]);
 
   const save = useCallback(
     async (nextData: JsonData) => {
       if (!id) return;
       setSaveStatus("saving");
       try {
-        await updateDoc(doc(db, "resumes", id), {
+        await updateDoc(doc(db, "users", user!.uid, "resumes", id), {
           jsonData: nextData,
           updatedAt: serverTimestamp(),
         });

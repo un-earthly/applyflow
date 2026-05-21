@@ -41,18 +41,19 @@ export default function ResumeIdTailorPage(): React.ReactElement {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, "resumes", id)).then((snap) => {
+    if (!id || !user) return;
+    getDoc(doc(db, "users", user.uid, "resumes", id)).then((snap) => {
       if (snap.exists()) setResume({ id: snap.id, ...(snap.data() as Omit<Resume, "id">) });
     });
-  }, [id]);
+  }, [id, user]);
 
   const analyze = async () => {
-    if (!jd.trim()) return;
+    if (!jd.trim() || !user) return;
     setLoading(true);
+    const token = await user.getIdToken();
     const res = await fetch(`/api/resumes/${id}/tailor`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ jd }),
     });
     if (res.ok) {
@@ -67,16 +68,15 @@ export default function ResumeIdTailorPage(): React.ReactElement {
     if (!user || !result) return;
     setSaving(true);
     const acceptedSuggestions = result.suggestions.filter((_, i) => accepted.has(i));
-    await addDoc(collection(db, "resumeVersions"), {
+    await addDoc(collection(db, "users", user.uid, "resumeVersions"), {
       resumeId: id,
-      userId: user.uid,
       label: `Tailored — ${new Date().toLocaleDateString()}`,
       tailored: true,
       suggestions: acceptedSuggestions,
       createdAt: serverTimestamp(),
     });
     setSaving(false);
-    router.push(`/dashboard/resume/${id}`);
+    router.push(`/dashboard/resumes/${id}/edit`);
   };
 
   if (!resume) {

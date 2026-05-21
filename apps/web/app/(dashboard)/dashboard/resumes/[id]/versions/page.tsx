@@ -40,9 +40,8 @@ export default function ResumeVersionsPage(): React.ReactElement {
   useEffect(() => {
     if (!user || !id) return;
     const q = query(
-      collection(db, "resumeVersions"),
+      collection(db, "users", user.uid, "resumeVersions"),
       where("resumeId", "==", id),
-      where("userId", "==", user.uid),
       orderBy("createdAt", "desc"),
     );
     getDocs(q).then((snap) => {
@@ -53,9 +52,9 @@ export default function ResumeVersionsPage(): React.ReactElement {
   const restore = async (version: ResumeVersion) => {
     if (!version.content) return;
     setRestoring(version.id);
-    await setDoc(doc(db, "resumes", id), { content: version.content }, { merge: true });
+    await setDoc(doc(db, "users", user!.uid, "resumes", id), { content: version.content }, { merge: true });
     setRestoring(null);
-    router.push(`/dashboard/resume/${id}/edit`);
+    router.push(`/dashboard/resumes/${id}/edit`);
   };
 
   return (
