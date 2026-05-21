@@ -87,9 +87,11 @@ export default function DangerZonePage(): React.ReactElement {
               <p className="text-xs text-muted-foreground mt-0.5">{action.description}</p>
             </div>
             <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="destructive" size="sm" className="shrink-0" />}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="shrink-0">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
@@ -132,15 +134,13 @@ export default function DangerZonePage(): React.ReactElement {
           />
         </div>
         <AlertDialog>
-          <AlertDialogTrigger
-            render={
-              <Button
-                variant="destructive"
-                disabled={confirmEmail !== user?.email || deleting}
-              />
-            }
-          >
-            {deleting ? "Deleting…" : "Delete my account"}
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              disabled={confirmEmail !== user?.email || deleting}
+            >
+              {deleting ? "Deleting…" : "Delete my account"}
+            </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

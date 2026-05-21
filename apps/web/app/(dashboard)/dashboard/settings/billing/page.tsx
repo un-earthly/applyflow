@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import Link from "next/link";
 import { CheckCircle2, Zap, ExternalLink, Loader2 } from "lucide-react";
 
 const PRO_FEATURES = [
@@ -112,7 +113,7 @@ export default function BillingSettingsPage(): React.ReactElement {
             <p className="text-muted-foreground text-sm">Renews on {renewalDate}</p>
           )}
           {sub.tier === "free" ? (
-            <Button href="/dashboard/settings/billing/upgrade">
+            <Button render={<Link href="/dashboard/settings/billing/upgrade" />}>
               <Zap className="mr-2 h-4 w-4" />
               Upgrade to Pro — $12/mo
             </Button>

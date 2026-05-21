@@ -121,7 +121,7 @@ export default function ApplicationDetailPage() {
     autosaveRef.current = setTimeout(() => void persistNotes(value), 2000);
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: ApplicationStatus) => {
     if (!docRef || !application) return;
     await updateDoc(docRef, { status: newStatus, updatedAt: serverTimestamp() });
   };
@@ -201,10 +201,8 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="shrink-0">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="shrink-0" />}>
+            <MoreVertical className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuSeparator />
@@ -219,7 +217,7 @@ export default function ApplicationDetailPage() {
       {/* Status selector */}
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium">Status</span>
-        <Select value={application.status} onValueChange={handleStatusChange}>
+        <Select value={application.status} onValueChange={(v) => v && void handleStatusChange(v)}>
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>

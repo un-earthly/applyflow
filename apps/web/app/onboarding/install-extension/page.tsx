@@ -6,7 +6,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Chrome, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? "applyflow-extension";
 
@@ -78,7 +78,7 @@ export default function InstallExtensionPage(): React.ReactElement {
           </>
         ) : (
           <>
-            <Chrome className="text-muted-foreground mx-auto h-12 w-12" />
+            <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center text-2xl">⚡</div>
             <div>
               <p className="font-medium">Not yet installed</p>
               <p className="text-muted-foreground text-sm">
@@ -86,7 +86,6 @@ export default function InstallExtensionPage(): React.ReactElement {
               </p>
             </div>
             <Button size="lg" className="w-full max-w-xs">
-              <Chrome className="mr-2 h-4 w-4" />
               Add to Chrome
             </Button>
           </>
