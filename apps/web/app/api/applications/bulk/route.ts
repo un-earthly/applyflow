@@ -27,9 +27,9 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   const batch = db.batch();
 
   for (const id of ids.slice(0, 100)) {
-    const ref = db.collection("applications").doc(id);
+    const ref = db.collection("users").doc(uid).collection("applications").doc(id);
     const snap = await ref.get();
-    if (snap.exists && snap.data()!.userId === uid) {
+    if (snap.exists) {
       batch.update(ref, { ...updates, updatedAt: FieldValue.serverTimestamp() });
     }
   }
