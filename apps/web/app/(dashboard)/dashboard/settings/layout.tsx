@@ -12,6 +12,7 @@ const SETTINGS_NAV = [
   { href: "/dashboard/settings/integrations", label: "Integrations" },
   { href: "/dashboard/settings/job-preferences", label: "Job preferences" },
   { href: "/dashboard/settings/privacy", label: "Privacy" },
+  { href: "/dashboard/settings/api-keys", label: "API keys" },
   { href: "/dashboard/settings/danger-zone", label: "Danger zone" },
 ];
 
