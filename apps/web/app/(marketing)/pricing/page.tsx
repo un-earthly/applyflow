@@ -23,15 +23,19 @@ export default function PricingPage() {
 
   const handleSubscribe = async (planId: string) => {
     if (!user) {
-      router.push("/login");
+      router.push(`/login?next=/pricing`);
       return;
     }
 
     setLoading(planId);
     try {
+      const token = await user.getIdToken();
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ planId }),
       });
 
