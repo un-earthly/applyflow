@@ -188,47 +188,6 @@ function showReviewPanel() {
 }
 
 export default defineContentScript({
-<<<<<<< HEAD
-  matches: [
-    "*://*.linkedin.com/*",
-    "*://*.indeed.com/*",
-    "*://*.greenhouse.io/*",
-    "*://jobs.lever.co/*",
-    "*://*.myworkdayjobs.com/*",
-    "*://*.ashbyhq.com/*",
-    "*://*.recruitee.com/*",
-    "*://*.bamboohr.com/*",
-    "*://*.smartrecruiters.com/*",
-  ],
-
-  main() {
-    // Run detection on load
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => void runDetection());
-    } else {
-      void runDetection();
-    }
-
-    // Re-run on navigation (SPA support)
-    const observer = new MutationObserver(() => {
-      void runDetection();
-    });
-    observer.observe(document.body, { childList: true, subtree: false });
-
-    // Message handler for popup queries
-    browser.runtime.onMessage.addListener((message: { type: string }, _sender, sendResponse) => {
-      if (message.type === "GET_DETECTION_STATUS") {
-        sendResponse(detectionState);
-        return true;
-      }
-      if (message.type === "DO_FILL") {
-        fillForm();
-        sendResponse({ success: true });
-        return true;
-      }
-    });
-  },
-=======
   matches: ['<all_urls>'],
   main() {
   const SUPPORTED_BOARDS = [
@@ -345,5 +304,4 @@ export default defineContentScript({
     }
   }
   }
->>>>>>> d735f1f7beede5531714c97ec3dd3b837c3ac3ef
 });
