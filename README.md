@@ -25,7 +25,7 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 | **Web App** | Next.js 16 (App Router), React 19, TypeScript | Modern, RSC, fast DX |
 | **Styling** | Tailwind CSS v4 \+ shadcn/ui | Rapid UI, accessible |
 | **Extension** | WXT \+ React \+ TypeScript | WXT is actively maintained (Plasmo is in maintenance mode as of 2025-26). Vite-based, framework-agnostic, MV3 ready |
-| **Backend** | Supabase | Auth, Postgres, Storage, Edge Functions, Realtime — all-in-one, zero backend code |
+| **Backend** | Firebase | Auth, Firestore, Storage, Cloud Functions, Realtime — all-in-one, zero backend code |
 | **AI/LLM** | OpenAI GPT-4o / Claude 3.5 Sonnet | Resume parsing, field mapping, job matching, cover letters |
 | **Agentic** | Custom content-script agent \+ Skyvern API fallback | Extension-native form detection \+ Skyvern for complex multi-page flows |
 | **Payments** | Stripe (Checkout \+ Customer Portal) | Subscription tiers, metered billing |
@@ -61,7 +61,7 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 1. **Detect** — Content script scans page for job application forms (LinkedIn, Indeed, Greenhouse, Lever, Workday, custom ATS).  
 2. **Extract** — Pulls field labels, placeholders, required fields, dropdown options.  
 3. **Map** — Sends field schema \+ user resume JSON to LLM. Returns field→value mappings with confidence scores.  
-4. **Fill** — Injects values into form fields. For file uploads (resume/CV), uses pre-uploaded URL from Supabase Storage.  
+4. **Fill** — Injects values into form fields. For file uploads (resume/CV), uses pre-uploaded URL from Firebase Storage.  
 5. **Submit** — Either auto-submits (if confidence \> threshold) or queues for user review in popup.  
 6. **Log** — Records application to backend (company, role, URL, date, status).
 
@@ -78,15 +78,15 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 - Visual editor (forms) ↔ JSON editor (monaco) toggle  
 - AI import: Parse PDF/DOCX → JSON Resume via GPT-4o  
 - AI tailor: Paste job description → get optimized resume variant  
-- Template rendering: HTML/PDF export via React-PDF or Puppeteer  
-- Storage: Supabase DB (structured) \+ Supabase Storage (PDF exports)
+-- Template rendering: HTML/PDF export via React-PDF or Puppeteer  
+-- Storage: Firebase Firestore (structured) \+ Firebase Storage (PDF exports)
 
 ### 3.3 User Dashboard (Next.js App)
 
 **Routes:**
 
 - `/` — Landing page  
-- `/login`, `/signup` — Supabase Auth (OAuth \+ email)  
+-- `/login`, `/signup` — Firebase Auth (OAuth \+ email)  
 - `/dashboard` — Main dashboard  
   - Applications pipeline (Applied → Screening → Interview → Offer)  
   - Stats: applications/day, response rate, source breakdown  
@@ -125,9 +125,9 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 
 ---
 
-## 4\. Data Model (Supabase PostgreSQL)
+## 4\. Data Model (Firebase / Firestore)
 
-`-- Users (handled by Supabase Auth, extended via profiles)`  
+`-- Users (handled by Firebase Auth, extended via profiles)`  
 `profiles`  
 `- id (uuid, pk, ref auth.users)`  
 `- full_name`  
@@ -218,8 +218,8 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 **Fallback for Complex Flows:**
 
 - Multi-page applications → Use Skyvern API to orchestrate  
-- CAPTCHA → Pause, notify user  
-- File upload → Use pre-signed Supabase Storage URL
+-- CAPTCHA → Pause, notify user  
+-- File upload → Use pre-signed Firebase Storage URL
 
 ### Job Matching Agent (Backend)
 
@@ -234,10 +234,10 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 
 | Integration | Purpose |
 | :---- | :---- |
-| **Supabase Auth** | Login, SSO, session management |
-| **Supabase DB** | All application data |
-| **Supabase Edge Functions** | Stripe webhooks, LLM proxy (rate limit \+ audit), PDF generation |
-| **Supabase Storage** | Resume PDFs, cover letters, avatars |
+| **Firebase Auth** | Login, SSO, session management |
+| **Firebase Firestore** | All application data |
+| **Firebase Cloud Functions** | Stripe webhooks, LLM proxy (rate limit \+ audit), PDF generation |
+| **Firebase Storage** | Resume PDFs, cover letters, avatars |
 | **Stripe** | Subscriptions, billing portal |
 | **OpenAI API** | Resume parsing, field mapping, job matching, cover letters |
 | **Skyvern API** (optional) | Complex multi-page application flows |
@@ -258,9 +258,9 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 
 - [ ] Project structure (monorepo: web \+ extension)  
 - [ ] Next.js 15 \+ shadcn/ui init  
-- [ ] WXT extension init  
-- [ ] Supabase project setup  
-- [ ] Database schema migrations  
+-- [ ] WXT extension init  
+-- [ ] Firebase project setup  
+-- [ ] Database schema migrations  
 - [ ] Stripe product/price setup  
 - [ ] Environment variables
 
@@ -299,7 +299,7 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 | Service | Tier | Cost |
 | :---- | :---- | :---- |
 | **Vercel** | Pro | $20/mo |
-| **Supabase** | Pro | $25/mo |
+| **Firebase** | Pro | $25/mo |
 | **OpenAI API** | GPT-4o (\~500 calls/day) | \~$150-300/mo |
 | **Stripe** | 0.5% \+ $0.25/transaction | Variable |
 | **Skyvern** (optional fallback) | Pay-as-you-go | \~$50/mo |
@@ -374,7 +374,7 @@ ApplyFlow is a **subscription-based SaaS** that helps job seekers automate their
 `│   ├── shared/              # Shared types, utils, API clients`  
 `│   ├── ui/                  # Shared shadcn components`  
 `│   └── config/              # Shared tsconfig, eslint, tailwind configs`  
-`├── supabase/`  
+`├── firebase/`  
 `│   ├── migrations/`  
 `│   └── functions/`  
 `└── SCOPE.md`

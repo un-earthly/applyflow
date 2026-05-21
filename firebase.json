@@ -10,7 +10,10 @@
       "emailPassword": true,
       "googleSignIn": {
         "oAuthBrandDisplayName": "ApplyFlow",
-        "supportEmail": "md.c.alamin00@gmail.com"
+        "supportEmail": "hopperisthebest@gmail.com",
+        "authorizedRedirectUris": [
+          "https://applyflow.vercel.app"
+        ]
       }
     }
   }

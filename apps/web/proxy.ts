@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/login", "/signup"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password"];
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.some((p) => pathname === p) || pathname.startsWith("/_next")) {
@@ -10,10 +10,12 @@ export function middleware(request: NextRequest): NextResponse {
   }
 
   const session = request.cookies.get("session");
-  if (pathname.startsWith("/dashboard") && !session) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-  if (pathname.startsWith("/admin") && !session) {
+  if (
+    (pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/onboarding") ||
+      pathname.startsWith("/admin")) &&
+    !session
+  ) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
