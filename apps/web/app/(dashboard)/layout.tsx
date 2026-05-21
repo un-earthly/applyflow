@@ -184,6 +184,13 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:left-4 focus:top-4 focus:rounded focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+      >
+        Skip to main content
+      </a>
+
       {/* Sidebar — lg+ */}
       <aside className="hidden w-60 shrink-0 border-r lg:flex lg:flex-col">
         <SidebarContent />
@@ -226,7 +233,7 @@ export default function DashboardLayout({
           </DropdownMenu>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">{children}</div>
         </main>
       </div>

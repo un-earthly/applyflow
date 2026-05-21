@@ -82,11 +82,9 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
   return (
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-2xl px-4 md:px-6">
-        <Button variant="ghost" size="sm" className="mb-8 -ml-2" asChild>
-          <Link href="/blog">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to blog
-          </Link>
+        <Button variant="ghost" size="sm" className="mb-8 -ml-2" render={<Link href="/blog" />}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to blog
         </Button>
 
         <div className="mb-8">

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
 
 export default function NotFound(): React.ReactElement {
   return (
@@ -11,12 +10,8 @@ export default function NotFound(): React.ReactElement {
         The page you&apos;re looking for doesn&apos;t exist or has been moved.
       </p>
       <div className="mt-8 flex gap-3">
-        <Button asChild>
-          <Link href="/">Go home</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/dashboard">Dashboard</Link>
-        </Button>
+        <Button render={<Link href="/" />}>Go home</Button>
+        <Button variant="outline" render={<Link href="/dashboard" />}>Dashboard</Button>
       </div>
     </div>
   );

@@ -54,12 +54,8 @@ export default function AboutPage(): React.ReactElement {
         </div>
 
         <div className="mt-16 flex gap-4">
-          <Button size="lg" asChild>
-            <Link href="/signup">Try ApplyFlow free</Link>
-          </Button>
-          <Button variant="outline" size="lg" asChild>
-            <Link href="/contact">Contact us</Link>
-          </Button>
+          <Button size="lg" render={<Link href="/signup" />}>Try ApplyFlow free</Button>
+          <Button variant="outline" size="lg" render={<Link href="/contact" />}>Contact us</Button>
         </div>
       </div>
     </div>

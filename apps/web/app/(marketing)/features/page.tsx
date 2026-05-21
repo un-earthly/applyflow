@@ -98,12 +98,8 @@ export default function FeaturesPage(): React.ReactElement {
             in one seamless workflow.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <Button size="lg" asChild>
-              <Link href="/signup">Start free</Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/pricing">See pricing</Link>
-            </Button>
+            <Button size="lg" render={<Link href="/signup" />}>Start free</Button>
+            <Button variant="outline" size="lg" render={<Link href="/pricing" />}>See pricing</Button>
           </div>
         </div>
 
@@ -139,9 +135,7 @@ export default function FeaturesPage(): React.ReactElement {
           <p className="mt-3 text-primary-foreground/80">
             Join thousands of job seekers using ApplyFlow to cut application time in half.
           </p>
-          <Button className="mt-8 bg-white text-primary hover:bg-white/90" size="lg" asChild>
-            <Link href="/signup">Get started — it&apos;s free</Link>
-          </Button>
+          <Button className="mt-8 bg-white text-primary hover:bg-white/90" size="lg" render={<Link href="/signup" />}>Get started — it&apos;s free</Button>
         </div>
       </div>
     </div>

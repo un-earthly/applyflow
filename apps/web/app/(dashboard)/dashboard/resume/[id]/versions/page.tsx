@@ -101,15 +101,17 @@ export default function ResumeVersionsPage(): React.ReactElement {
                 )}
               </div>
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={restoring === version.id || !version.content}
-                  >
-                    <Undo2 className="mr-2 h-4 w-4" />
-                    Restore
-                  </Button>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={restoring === version.id || !version.content}
+                    />
+                  }
+                >
+                  <Undo2 className="mr-2 h-4 w-4" />
+                  Restore
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>

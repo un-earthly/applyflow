@@ -1,10 +1,13 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2025-04-30.basil",
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2026-04-22.dahlia",
+  });
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const sig = req.headers.get("stripe-signature");
@@ -18,7 +21,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const rawBody = await req.text();
 
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    event = getStripe().webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
