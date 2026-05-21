@@ -34,12 +34,16 @@ export default function BillingUpgradePage(): React.ReactElement {
     if (!user) return;
     setLoading(true);
     try {
+      const token = await user.getIdToken();
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval: yearly ? "year" : "month", userId: user.uid }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planId: yearly ? "pro-annual" : "pro" }),
       });
-      const { url } = await res.json() as { url: string };
+      const { url } = (await res.json()) as { url?: string };
       if (url) window.location.href = url;
     } catch {
       setLoading(false);
