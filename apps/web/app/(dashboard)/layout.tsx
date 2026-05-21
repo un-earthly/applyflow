@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,13 +12,150 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  LayoutDashboard,
+  Briefcase,
+  Clock,
+  FileText,
+  Mail,
+  BookmarkCheck,
+  BarChart3,
+  Settings,
+  LogOut,
+  Menu,
+  Zap,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const navItems = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/resume", label: "Resume" },
-  { href: "/dashboard/jobs", label: "Jobs" },
-  { href: "/dashboard/settings", label: "Settings" },
+const NAV_GROUPS = [
+  {
+    label: "Workspace",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/dashboard/applications", label: "Applications", icon: Briefcase },
+      { href: "/dashboard/queue", label: "Queue", icon: Clock },
+    ],
+  },
+  {
+    label: "Library",
+    items: [
+      { href: "/dashboard/resume", label: "Resumes", icon: FileText },
+      { href: "/dashboard/cover-letters", label: "Cover Letters", icon: Mail },
+      { href: "/dashboard/jobs", label: "Jobs", icon: BookmarkCheck },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
 ];
+
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  exact,
+}: {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  exact?: boolean;
+}): React.ReactElement {
+  const pathname = usePathname();
+  const active = exact ? pathname === href : pathname.startsWith(href);
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+        active
+          ? "bg-muted font-medium text-foreground"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {label}
+    </Link>
+  );
+}
+
+function SidebarContent(): React.ReactElement {
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+
+  const initials = user?.displayName
+    ? user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase()
+    : user?.email?.[0]?.toUpperCase() ?? "U";
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="p-4">
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+          <Zap className="h-5 w-5 text-primary" />
+          ApplyFlow
+        </Link>
+      </div>
+      <Separator />
+      <nav className="flex-1 space-y-4 overflow-y-auto p-3">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="text-muted-foreground mb-1 px-3 text-xs font-medium uppercase tracking-wider">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <NavLink key={item.href} {...item} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+      <Separator />
+      <div className="p-3">
+        <div className="mb-2 rounded-lg border bg-muted/30 p-3 text-xs">
+          <p className="font-medium">Free plan</p>
+          <p className="text-muted-foreground mt-0.5">10 autofills / month</p>
+          <Button size="sm" className="mt-2 w-full" onClick={() => router.push("/dashboard/settings/billing")}>
+            Upgrade to Pro
+          </Button>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-muted transition-colors outline-none">
+            <Avatar className="h-7 w-7">
+              <AvatarImage src={user?.photoURL ?? undefined} />
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate font-medium leading-none">{user?.displayName ?? "User"}</p>
+              <p className="text-muted-foreground truncate text-xs">{user?.email}</p>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" className="w-48">
+            <DropdownMenuItem onClick={() => router.push("/dashboard/settings/profile")}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => { void signOut().then(() => router.push("/login")); }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -27,7 +164,7 @@ export default function DashboardLayout({
 }): React.ReactElement {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -46,29 +183,27 @@ export default function DashboardLayout({
     : user.email?.[0]?.toUpperCase() ?? "U";
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="font-semibold">
-              ApplyFlow
-            </Link>
-            <nav className="flex items-center gap-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                    pathname === item.href
-                      ? "bg-muted font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
+    <div className="flex min-h-screen">
+      {/* Sidebar — lg+ */}
+      <aside className="hidden w-60 shrink-0 border-r lg:flex lg:flex-col">
+        <SidebarContent />
+      </aside>
+
+      {/* Main content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Topbar — mobile */}
+        <header className="flex h-14 items-center justify-between border-b px-4 lg:hidden">
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger render={<Button variant="ghost" size="icon-sm" />}>
+              <Menu className="h-5 w-5" />
+            </SheetTrigger>
+            <SheetContent side="left" className="w-60 p-0">
+              <SidebarContent />
+            </SheetContent>
+          </Sheet>
+          <Link href="/dashboard" className="font-semibold">
+            ApplyFlow
+          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Avatar className="h-8 w-8 cursor-pointer">
@@ -77,26 +212,24 @@ export default function DashboardLayout({
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <div className="px-2 py-1.5 text-sm">
-                <p className="font-medium">{user.displayName ?? "User"}</p>
-                <p className="text-muted-foreground text-xs">{user.email}</p>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+              <DropdownMenuItem onClick={() => router.push("/dashboard/settings/profile")}>
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => { void signOut().then(() => router.push("/login")); }}
                 variant="destructive"
+                onClick={() => { void signOut().then(() => router.push("/login")); }}
               >
                 Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
