@@ -8,8 +8,6 @@ import {
   where,
   orderBy,
   onSnapshot,
-  addDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase/client";
@@ -63,19 +61,23 @@ export default function CoverLettersPage(): React.ReactElement {
     if (!user || !form.company || !form.role) return;
     setCreating(true);
     try {
-      const placeholder = `Dear Hiring Manager,\n\nI am excited to apply for the ${form.role} position at ${form.company}. [Edit this cover letter to make it your own.]\n\nBest regards,\n${user.displayName ?? "Your Name"}`;
-      const ref = await addDoc(collection(db, "coverLetters"), {
-        userId: user.uid,
-        company: form.company,
-        role: form.role,
-        jobDescription: form.jobDescription,
-        content: placeholder,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const token = await user.getIdToken();
+      const res = await fetch("/api/cover-letters", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          company: form.company,
+          role: form.role,
+          jd: form.jobDescription,
+        }),
       });
+      const { id } = (await res.json()) as { id: string };
       setOpen(false);
       setForm({ company: "", role: "", jobDescription: "" });
-      router.push(`/dashboard/cover-letters/${ref.id}`);
+      router.push(`/dashboard/cover-letters/${id}`);
     } finally {
       setCreating(false);
     }
