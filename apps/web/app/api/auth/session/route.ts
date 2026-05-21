@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 
+// GET: Called by the extension alarm every 50 min to verify token is still valid.
+// Returns the same token if still valid; extension re-pairs when it expires.
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const token = request.headers.get("authorization")?.slice(7);
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const decoded = await adminAuth().verifyIdToken(token);
-    const newToken = await adminAuth().createCustomToken(decoded.uid);
-    return NextResponse.json({ token: newToken });
+    // Token is still valid — return it so the extension can store the latest expiry info
+    return NextResponse.json({ ok: true, uid: decoded.uid, expiresAt: decoded.exp * 1000 });
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Token expired" }, { status: 401 });
   }
 }
 

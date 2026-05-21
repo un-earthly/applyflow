@@ -266,11 +266,9 @@ export default () => {
       const res = await fetch(`${APP_URL}/api/auth/session`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const { token: newToken } = (await res.json()) as { token?: string };
-        if (newToken) {
-          await chrome.storage.local.set({ "session:token": newToken });
-        }
+      if (res.status === 401) {
+        // Token expired — clear session so popup shows sign-in
+        await chrome.storage.local.remove(["session:token", "auth:user"]);
       }
     } catch {
       // Silently ignore; next alarm will retry
