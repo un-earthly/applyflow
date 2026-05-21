@@ -50,8 +50,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let resumeContent = "";
   if (resumeId) {
-    const snap = await adminDb().collection("resumes").doc(resumeId).get();
-    if (snap.exists && snap.data()!.userId === uid) {
+    const snap = await adminDb().collection("users").doc(uid).collection("resumes").doc(resumeId).get();
+    if (snap.exists) {
       resumeContent = JSON.stringify(snap.data()!.content ?? {});
     }
   } else {

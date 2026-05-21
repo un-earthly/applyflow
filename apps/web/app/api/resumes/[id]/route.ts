@@ -23,13 +23,10 @@ export async function GET(req: NextRequest, { params }: RouteContext): Promise<N
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const snap = await adminDb().collection("resumes").doc(id).get();
+  const snap = await adminDb().collection("users").doc(uid).collection("resumes").doc(id).get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const data = snap.data()!;
-  if (data.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
-  return NextResponse.json({ id: snap.id, ...data });
+  return NextResponse.json({ id: snap.id, ...snap.data() });
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext): Promise<NextResponse> {
@@ -37,10 +34,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext): Promise
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const ref = adminDb().collection("resumes").doc(id);
+  const ref = adminDb().collection("users").doc(uid).collection("resumes").doc(id);
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json() as Record<string, unknown>;
   await ref.update({ ...body, updatedAt: FieldValue.serverTimestamp() });
@@ -52,10 +48,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext): Promis
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const ref = adminDb().collection("resumes").doc(id);
+  const ref = adminDb().collection("users").doc(uid).collection("resumes").doc(id);
   const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await ref.delete();
   return NextResponse.json({ success: true });

@@ -22,9 +22,8 @@ export async function POST(req: NextRequest, { params }: RouteContext): Promise<
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const snap = await adminDb().collection("resumes").doc(id).get();
+  const snap = await adminDb().collection("users").doc(uid).collection("resumes").doc(id).get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // In production, this generates a PDF using a service like Puppeteer or PDFKit
   // and returns a signed download URL from Firebase Storage.

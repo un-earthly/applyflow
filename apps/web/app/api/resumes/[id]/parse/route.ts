@@ -23,9 +23,9 @@ export async function POST(req: NextRequest, { params }: RouteContext): Promise<
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const snap = await adminDb().collection("resumes").doc(id).get();
+  const ref = adminDb().collection("users").doc(uid).collection("resumes").doc(id);
+  const snap = await ref.get();
   if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (snap.data()!.userId !== uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // In production, this would parse the uploaded PDF/DOCX from Firebase Storage
   // and extract structured resume sections using an AI model.
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: RouteContext): Promise<
     certifications: [],
   };
 
-  await adminDb().collection("resumes").doc(id).update({
+  await ref.update({
     content: parsed,
     updatedAt: FieldValue.serverTimestamp(),
   });
