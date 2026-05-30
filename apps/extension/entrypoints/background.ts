@@ -65,9 +65,11 @@ export default () => {
       switch (request.type) {
         case "GET_AUTH_STATUS": {
           let status = await getAuthStatus();
+          // Never await syncAuthFromCookie() here — it calls fetch() which can
+          // hang, causing sendResponse to never fire and the popup to stall.
+          // Fire-and-forget; the startup call + next GET_AUTH_STATUS will pick it up.
           if (!status.isLoggedIn) {
-            await syncAuthFromCookie();
-            status = await getAuthStatus();
+            void syncAuthFromCookie();
           }
           sendResponse(status);
           break;

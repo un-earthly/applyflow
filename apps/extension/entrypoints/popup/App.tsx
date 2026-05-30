@@ -37,25 +37,50 @@ export default function App() {
   });
 
   useEffect(() => {
-    // Ask the background for auth status. The background (background.ts) does
-    // the cookie sync itself, so we never need chrome.cookies in the popup.
-    chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' })
-      .then((status: { isLoggedIn: boolean; user?: { uid?: string; email?: string; displayName?: string; fullName?: string }; quota?: { used: number; total: number } }) => {
-        const profile = status?.user;
-        const displayName = profile?.displayName ?? profile?.fullName ?? null;
-        setAuth({
-          uid: status?.isLoggedIn ? (profile?.uid ?? null) : null,
-          email: profile?.email ?? null,
-          displayName,
-          firstName: displayName?.split(' ')[0] ?? null,
-          quota: status?.quota ?? { used: 0, total: 50 },
-          loading: false,
-        });
-      })
-      .catch(() => {
-        // Background not reachable — still clear the loading state
-        setAuth((prev) => ({ ...prev, loading: false }));
+    let cancelled = false;
+
+    const applyStatus = (status: { isLoggedIn?: boolean; user?: { uid?: string; email?: string; displayName?: string; fullName?: string }; quota?: { used: number; total: number } } | null) => {
+      if (cancelled) return;
+      const profile = status?.user;
+      const displayName = profile?.displayName ?? profile?.fullName ?? null;
+      setAuth({
+        uid: status?.isLoggedIn ? (profile?.uid ?? null) : null,
+        email: profile?.email ?? null,
+        displayName,
+        firstName: displayName?.split(' ')[0] ?? null,
+        quota: status?.quota ?? { used: 0, total: 50 },
+        loading: false,
       });
+    };
+
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
+      Promise.race([
+        promise.catch(() => null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+      ]);
+
+    const load = async () => {
+      // 3 s timeout — the popup must never hang waiting for the background SW.
+      const status = await withTimeout(
+        chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' }),
+        3000,
+      );
+      applyStatus(status as Parameters<typeof applyStatus>[0]);
+
+      // If the background returned nothing (SW was cold-starting / syncing cookie),
+      // retry once after 1.5 s to pick up the freshly stored token.
+      if (!status || !(status as { isLoggedIn?: boolean }).isLoggedIn) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const retry = await withTimeout(
+          chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' }),
+          3000,
+        );
+        applyStatus(retry as Parameters<typeof applyStatus>[0]);
+      }
+    };
+
+    void load();
+    return () => { cancelled = true; };
   }, []);
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
