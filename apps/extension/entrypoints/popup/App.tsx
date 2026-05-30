@@ -38,49 +38,51 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    let storageListener: ((changes: Record<string, chrome.storage.StorageChange>, area: string) => void) | null = null;
 
-    const applyStatus = (status: { isLoggedIn?: boolean; user?: { uid?: string; email?: string; displayName?: string; fullName?: string }; quota?: { used: number; total: number } } | null) => {
+    const applyItems = (items: Record<string, unknown>) => {
       if (cancelled) return;
-      const profile = status?.user;
+      const token = items['session:token'] as string | undefined;
+      const profile = items['auth:user'] as { uid?: string; email?: string; displayName?: string; fullName?: string } | undefined;
       const displayName = profile?.displayName ?? profile?.fullName ?? null;
       setAuth({
-        uid: status?.isLoggedIn ? (profile?.uid ?? null) : null,
+        uid: token ? (profile?.uid ?? null) : null,
         email: profile?.email ?? null,
         displayName,
         firstName: displayName?.split(' ')[0] ?? null,
-        quota: status?.quota ?? { used: 0, total: 50 },
+        quota: (items['quota:usage'] as { used: number; total: number }) ?? { used: 0, total: 50 },
         loading: false,
       });
     };
 
-    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
-      Promise.race([
-        promise.catch(() => null),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-      ]);
+    // Read chrome.storage.local directly — always fast, no service worker needed.
+    // This means loading always resolves quickly even if the SW is cold-starting.
+    chrome.storage.local.get(['auth:user', 'session:token', 'quota:usage'])
+      .then((items) => {
+        applyItems(items);
 
-    const load = async () => {
-      // 3 s timeout — the popup must never hang waiting for the background SW.
-      const status = await withTimeout(
-        chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' }),
-        3000,
-      );
-      applyStatus(status as Parameters<typeof applyStatus>[0]);
+        if (!items['session:token']) {
+          // Not logged in yet. Subscribe to storage changes so we auto-update
+          // the moment the background finishes the cookie sync — no polling needed.
+          storageListener = (changes, area) => {
+            if (area !== 'local' || !('session:token' in changes)) return;
+            chrome.storage.local.get(['auth:user', 'session:token', 'quota:usage']).then(applyItems);
+          };
+          chrome.storage.onChanged.addListener(storageListener);
 
-      // If the background returned nothing (SW was cold-starting / syncing cookie),
-      // retry once after 1.5 s to pick up the freshly stored token.
-      if (!status || !(status as { isLoggedIn?: boolean }).isLoggedIn) {
-        await new Promise((r) => setTimeout(r, 1500));
-        const retry = await withTimeout(
-          chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' }),
-          3000,
-        );
-        applyStatus(retry as Parameters<typeof applyStatus>[0]);
-      }
+          // Wake the service worker so it runs syncAuthFromCookie().
+          // Ignore errors — the onChanged listener is the real signal.
+          chrome.runtime.sendMessage({ type: 'GET_AUTH_STATUS' }).catch(() => {});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAuth((prev) => ({ ...prev, loading: false }));
+      });
+
+    return () => {
+      cancelled = true;
+      if (storageListener) chrome.storage.onChanged.removeListener(storageListener);
     };
-
-    void load();
-    return () => { cancelled = true; };
   }, []);
 
   const tabStyle = (active: boolean): React.CSSProperties => ({

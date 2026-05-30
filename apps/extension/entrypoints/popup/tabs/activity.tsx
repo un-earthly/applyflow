@@ -62,8 +62,11 @@ export default function ActivityTab() {
   const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
-    chrome.runtime.sendMessage({ type: 'GET_ACTIVITY_LOG', limit: 50 })
-      .then((r) => setActivities(r?.activities ?? []))
+    chrome.storage.local.get(['activity:log'])
+      .then((items) => {
+        const log = (items['activity:log'] ?? []) as ActivityItem[];
+        setActivities(log.slice(0, 50));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

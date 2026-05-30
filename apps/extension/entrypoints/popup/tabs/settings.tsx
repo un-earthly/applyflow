@@ -68,20 +68,26 @@ export default function SettingsTab({ auth, onSignOut }: SettingsTabProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }),
-      chrome.runtime.sendMessage({ type: 'GET_RESUMES' }),
-    ]).then(([settingsResp, resumeResp]) => {
-      if (settingsResp?.settings) setSettings(settingsResp.settings);
-      const list: Resume[] = resumeResp?.resumes ?? [];
-      setResumes(list);
-      setDefaultResume(list.find(r => r.isDefault) ?? list[0] ?? null);
-    }).catch(() => {}).finally(() => setLoading(false));
+    // Read settings and resumes directly from storage — no SW round-trip needed.
+    chrome.storage.local.get(['settings:preferences', 'cache:resumes'])
+      .then((items) => {
+        const prefs = items['settings:preferences'] as Partial<Settings> | undefined;
+        if (prefs) setSettings(s => ({ ...s, ...prefs }));
+
+        const list: Resume[] = (items['cache:resumes'] ?? []) as Resume[];
+        setResumes(list);
+        setDefaultResume(list.find(r => r.isDefault) ?? list[0] ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const updateSetting = async (key: keyof Settings, value: boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    await chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', settings: { [key]: value } });
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    // Write directly to storage — source of truth — then also notify the SW
+    await chrome.storage.local.set({ 'settings:preferences': next });
+    chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', settings: { [key]: value } }).catch(() => {});
   };
 
   const handleSignOut = async () => {

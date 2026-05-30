@@ -129,7 +129,9 @@ export default () => {
             sendResponse({ success: false, error: "Missing code" });
             break;
           }
-          const ok = await exchangePairingCode(request.code);
+          // request.sourceBase is the origin of the page that sent the code
+          // (e.g. "http://localhost:3000") — lets us call the right API endpoint
+          const ok = await exchangePairingCode(request.code, request.sourceBase as string | undefined);
           sendResponse({ success: ok });
           break;
         }
@@ -282,67 +284,62 @@ export default () => {
 
   // ── Extension auth pairing ─────────────────────────────────────────────────
 
-  async function exchangePairingCode(code: string): Promise<boolean> {
-    console.log("[ApplyFlow BG] Exchanging pairing code:", code);
-    try {
-      const res = await fetch(`${APP_URL}/api/auth/extension-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+  // sourceBase: the origin the extension-success page was served from.
+  // Passing it avoids calling the wrong environment's API (e.g. prod instead of localhost).
+  async function exchangePairingCode(code: string, sourceBase?: string): Promise<boolean> {
+    // Candidates to try in order: explicit source, configured APP_URL, localhost fallback
+    const bases = [...new Set([
+      sourceBase,
+      APP_URL,
+      "http://localhost:3000",
+    ].filter(Boolean))] as string[];
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        console.error("[ApplyFlow BG] extension-token error:", res.status, body);
-        return false;
-      }
-
-      const { idToken } = (await res.json()) as { idToken: string };
-      if (!idToken) {
-        console.error("[ApplyFlow BG] extension-token response missing idToken");
-        return false;
-      }
-
-      // Fetch user profile to store alongside token
-      let userData: Record<string, unknown> = {};
+    for (const base of bases) {
       try {
-        const profileRes = await fetch(`${APP_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${idToken}` },
+        console.log("[ApplyFlow BG] Trying extension-token at:", base);
+        const res = await fetch(`${base}/api/auth/extension-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
         });
-        if (profileRes.ok) {
-          userData = await profileRes.json() as Record<string, unknown>;
-        }
-      } catch {
-        // Non-fatal — auth still works without profile
-      }
 
-      await chrome.storage.local.set({
-        "session:token": idToken,
-        "auth:user": userData,
-      });
+        if (!res.ok) continue;
 
-      console.log("[ApplyFlow BG] Extension auth pairing succeeded");
-      return true;
-    } catch (err) {
-      console.error("[ApplyFlow BG] Extension auth pairing failed:", err);
-      return false;
+        const { idToken } = (await res.json()) as { idToken: string };
+        if (!idToken) continue;
+
+        let userData: Record<string, unknown> = {};
+        try {
+          const profileRes = await fetch(`${base}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          if (profileRes.ok) userData = await profileRes.json() as Record<string, unknown>;
+        } catch { /* non-fatal */ }
+
+        await chrome.storage.local.set({ "session:token": idToken, "auth:user": userData });
+        console.log("[ApplyFlow BG] Extension auth pairing succeeded via:", base);
+        return true;
+      } catch { /* try next */ }
     }
+
+    console.error("[ApplyFlow BG] Extension auth pairing failed for all candidates");
+    return false;
   }
 
-  // Fallback: monitor tabs for /auth/extension-success?code= (legacy / secondary)
+  // Fallback: monitor tabs for /auth/extension-success?code= (catches race vs content script)
+  // Matches both localhost dev and production — do NOT filter by APP_URL here.
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status !== "complete" || !tab.url) return;
-    const url = new URL(tab.url);
-    if (!url.href.startsWith(APP_URL) || url.pathname !== "/auth/extension-success") return;
+    let url: URL;
+    try { url = new URL(tab.url); } catch { return; }
+    if (url.pathname !== "/auth/extension-success") return;
 
     const code = url.searchParams.get("code");
-    if (!code) {
-      console.warn("[ApplyFlow BG] Tab reached extension-success but no code in URL");
-      return;
-    }
+    if (!code) return;
 
-    console.log("[ApplyFlow BG] Fallback tab capture for code:", code);
-    await exchangePairingCode(code);
+    const sourceBase = `${url.protocol}//${url.host}`;
+    console.log("[ApplyFlow BG] Fallback tab capture for code from:", sourceBase);
+    await exchangePairingCode(code, sourceBase);
   });
 
   // ── Token refresh alarm (every 50 min) ──────────────────────────────────────

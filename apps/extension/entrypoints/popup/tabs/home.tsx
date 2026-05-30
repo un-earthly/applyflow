@@ -60,16 +60,14 @@ export default function HomeTab({ auth }: HomeTabProps) {
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [settingsResp, activityResp] = await Promise.all([
-          chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }),
-          chrome.runtime.sendMessage({ type: 'GET_ACTIVITY_LOG', limit: 200 }),
-        ]);
+    // Read directly from chrome.storage.local — no service worker round-trip needed.
+    // sendMessage can hang if the SW is cold; storage reads are always instant.
+    chrome.storage.local.get(['settings:preferences', 'activity:log'])
+      .then((items) => {
+        const prefs = items['settings:preferences'] as { autoFill?: boolean } | undefined;
+        setAutoApply(prefs?.autoFill ?? false);
 
-        if (settingsResp?.settings) setAutoApply(settingsResp.settings.autoFill ?? false);
-
-        const activities: ActivityItem[] = activityResp?.activities ?? [];
+        const activities: ActivityItem[] = ((items['activity:log'] ?? []) as ActivityItem[]).slice(0, 200);
         const now = new Date();
         const todayStr = now.toDateString();
         const thisMonth = now.getMonth();
@@ -84,19 +82,19 @@ export default function HomeTab({ auth }: HomeTabProps) {
           }).length,
           recent: activities.slice(0, 4),
         });
-      } catch (e) {
-        console.warn('[ApplyFlow] Home load failed:', e);
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-    load();
+      })
+      .catch(() => {})
+      .finally(() => setLoadingStats(false));
   }, []);
 
   const toggleAutoApply = async () => {
     const next = !autoApply;
     setAutoApply(next);
-    await chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', settings: { autoFill: next } });
+    // Write directly to storage first, then notify SW (fire-and-forget)
+    const items = await chrome.storage.local.get(['settings:preferences']);
+    const current = (items['settings:preferences'] as object) ?? {};
+    await chrome.storage.local.set({ 'settings:preferences': { ...current, autoFill: next } });
+    chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', settings: { autoFill: next } }).catch(() => {});
   };
 
   const quotaPct = Math.min((auth.quota.used / auth.quota.total) * 100, 100);
