@@ -4,7 +4,50 @@ export default () => {
     [key: string]: any;
   }
 
-  const APP_URL = import.meta.env.VITE_APP_URL ?? "https://app.applyflow.io";
+  const APP_URL = import.meta.env.WXT_APP_URL ?? "https://app.applyflow.io";
+
+  // ── Cookie-based auth discovery ──────────────────────────────────────────────
+  // Finds the af_id_token cookie across ALL domains (not just APP_URL) so that
+  // dev users logged in on localhost are auto-synced without setting WXT_APP_URL.
+
+  function apiBaseFromCookieDomain(domain: string): string {
+    if (domain.includes("localhost")) return "http://localhost:3000";
+    if (domain.includes("applyflow.io")) return "https://app.applyflow.io";
+    return APP_URL;
+  }
+
+  async function syncAuthFromCookie(): Promise<boolean> {
+    try {
+      const items = await chrome.storage.local.get(["session:token"]);
+      if (items["session:token"]) return true; // already have a token
+
+      const cookies = await chrome.cookies.getAll({ name: "af_id_token" });
+      if (!cookies.length) return false;
+
+      const cookie = cookies[0]!;
+      const baseUrl = apiBaseFromCookieDomain(cookie.domain ?? "");
+
+      const res = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${cookie.value}` },
+      });
+      if (!res.ok) return false;
+
+      const userData = await res.json() as Record<string, unknown>;
+      await chrome.storage.local.set({
+        "session:token": cookie.value,
+        "auth:user": userData,
+      });
+      console.log("[ApplyFlow BG] Cookie auto-sync succeeded for domain:", cookie.domain);
+      return true;
+    } catch (e) {
+      console.warn("[ApplyFlow BG] Cookie auto-sync failed:", e);
+      return false;
+    }
+  }
+
+  // Run cookie sync on service-worker startup so the popup is already authed
+  // when the user first opens it after logging in on the web app.
+  void syncAuthFromCookie();
 
   // ── Message bus ─────────────────────────────────────────────────────────────
 
@@ -20,9 +63,15 @@ export default () => {
   ) {
     try {
       switch (request.type) {
-        case "GET_AUTH_STATUS":
-          sendResponse(await getAuthStatus());
+        case "GET_AUTH_STATUS": {
+          let status = await getAuthStatus();
+          if (!status.isLoggedIn) {
+            await syncAuthFromCookie();
+            status = await getAuthStatus();
+          }
+          sendResponse(status);
           break;
+        }
 
         case "GET_SESSION":
           sendResponse(await getSession());
@@ -72,6 +121,17 @@ export default () => {
           sendResponse({ success: true });
           break;
 
+        case "PAIR_CODE": {
+          console.log("[ApplyFlow BG] PAIR_CODE received:", request.code);
+          if (!request.code) {
+            sendResponse({ success: false, error: "Missing code" });
+            break;
+          }
+          const ok = await exchangePairingCode(request.code);
+          sendResponse({ success: ok });
+          break;
+        }
+
         case "LOGOUT":
           await chrome.storage.local.remove(["session:token", "auth:user", "cache:resumes"]);
           sendResponse({ success: true });
@@ -96,6 +156,11 @@ export default () => {
 
   async function getAuthStatus() {
     const items = await chrome.storage.local.get(["session:token", "auth:user", "quota:usage"]);
+    console.log("[ApplyFlow BG] getAuthStatus read:", {
+      isLoggedIn: !!items["session:token"],
+      tokenPreview: (items["session:token"] as string | undefined)?.slice(0, 20) + "...",
+      hasUser: !!items["auth:user"],
+    });
     return {
       isLoggedIn: !!items["session:token"],
       user: items["auth:user"],
@@ -213,25 +278,28 @@ export default () => {
     }
   }
 
-  // ── Extension auth pairing — monitors tabs for /auth/extension-success?code= ─
+  // ── Extension auth pairing ─────────────────────────────────────────────────
 
-  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.status !== "complete" || !tab.url) return;
-    const url = new URL(tab.url);
-    if (!url.href.startsWith(APP_URL) || url.pathname !== "/auth/extension-success") return;
-
-    const code = url.searchParams.get("code");
-    if (!code) return;
-
+  async function exchangePairingCode(code: string): Promise<boolean> {
+    console.log("[ApplyFlow BG] Exchanging pairing code:", code);
     try {
       const res = await fetch(`${APP_URL}/api/auth/extension-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
-      if (!res.ok) return;
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("[ApplyFlow BG] extension-token error:", res.status, body);
+        return false;
+      }
+
       const { idToken } = (await res.json()) as { idToken: string };
-      if (!idToken) return;
+      if (!idToken) {
+        console.error("[ApplyFlow BG] extension-token response missing idToken");
+        return false;
+      }
 
       // Fetch user profile to store alongside token
       let userData: Record<string, unknown> = {};
@@ -250,9 +318,29 @@ export default () => {
         "session:token": idToken,
         "auth:user": userData,
       });
+
+      console.log("[ApplyFlow BG] Extension auth pairing succeeded");
+      return true;
     } catch (err) {
-      console.warn("[ApplyFlow] Extension auth pairing failed:", err);
+      console.error("[ApplyFlow BG] Extension auth pairing failed:", err);
+      return false;
     }
+  }
+
+  // Fallback: monitor tabs for /auth/extension-success?code= (legacy / secondary)
+  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status !== "complete" || !tab.url) return;
+    const url = new URL(tab.url);
+    if (!url.href.startsWith(APP_URL) || url.pathname !== "/auth/extension-success") return;
+
+    const code = url.searchParams.get("code");
+    if (!code) {
+      console.warn("[ApplyFlow BG] Tab reached extension-success but no code in URL");
+      return;
+    }
+
+    console.log("[ApplyFlow BG] Fallback tab capture for code:", code);
+    await exchangePairingCode(code);
   });
 
   // ── Token refresh alarm (every 50 min) ──────────────────────────────────────
