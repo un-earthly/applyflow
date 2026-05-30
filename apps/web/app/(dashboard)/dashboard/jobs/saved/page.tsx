@@ -44,7 +44,7 @@ export default function SavedJobsPage(): React.ReactElement {
         </div>
       ) : jobs.length === 0 ? (
         <EmptyState
-          icon={Bookmark}
+          icon={<Bookmark className="h-8 w-8 text-muted-foreground" />}
           title="No saved jobs yet"
           description="Use the extension to bookmark jobs while browsing, or save them from job detail pages."
         />

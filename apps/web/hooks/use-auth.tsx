@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
-  onAuthStateChanged,
+  onIdTokenChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setUser(u);
       setLoading(false);
       if (u) {

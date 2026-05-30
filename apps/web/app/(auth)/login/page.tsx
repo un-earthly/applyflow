@@ -52,14 +52,19 @@ function LoginForm(): React.ReactElement {
   const afterAuth = async () => {
     if (returnTo === "extension") {
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!currentUser) {
+        console.error("[ApplyFlow Login] afterAuth called but no currentUser");
+        return;
+      }
       const idToken = await currentUser.getIdToken();
       const code = crypto.randomUUID().replace(/-/g, "");
+      console.log("[ApplyFlow Login] Writing pairing code:", code);
       await setDoc(doc(db, "pairings", code), {
         idToken,
         expiresAt: Date.now() + 5 * 60 * 1000,
         createdAt: serverTimestamp(),
       });
+      console.log("[ApplyFlow Login] Redirecting to extension-success with code");
       router.push(`/auth/extension-success?code=${code}`);
     } else {
       router.push(next ?? "/dashboard");

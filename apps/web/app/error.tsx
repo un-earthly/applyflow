@@ -20,7 +20,7 @@ export default function RootError({
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <EmptyState
-        icon={AlertTriangle}
+        icon={<AlertTriangle className="h-8 w-8 text-muted-foreground" />}
         title="Something went wrong"
         description={error.message || "An unexpected error occurred. Please try again."}
         action={{ label: "Try again", onClick: reset }}

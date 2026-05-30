@@ -1,6 +1,34 @@
 export default defineContentScript({
   matches: ["<all_urls>"],
   main() {
+    // ── Extension auth bridge ────────────────────────────────────────────────
+    // When the web app redirects to /auth/extension-success after login, extract
+    // the pairing code and send it to the background service worker immediately.
+    // This avoids the race condition between tabs.onUpdated and window.close()
+    // / service-worker lifecycle.
+    if (location.pathname === "/auth/extension-success") {
+      const sendPairCode = async () => {
+        const el = document.getElementById("af-extension-bridge");
+        const code = el?.dataset.code ?? new URLSearchParams(location.search).get("code");
+        if (code) {
+          console.log("[ApplyFlow Content] Bridge page detected, sending PAIR_CODE:", code);
+          try {
+            const res = await browser.runtime.sendMessage({ type: "PAIR_CODE", code });
+            console.log("[ApplyFlow Content] PAIR_CODE acknowledged:", res);
+          } catch (err) {
+            console.warn("[ApplyFlow Content] PAIR_CODE send failed:", err);
+          }
+        } else {
+          console.warn("[ApplyFlow Content] Bridge page loaded but no pairing code found");
+        }
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => { void sendPairCode(); });
+      } else {
+        void sendPairCode();
+      }
+    }
+
     const SUPPORTED_BOARDS: Record<string, { name: string; selectors: string[] }> = {
       "linkedin.com": {
         name: "LinkedIn",

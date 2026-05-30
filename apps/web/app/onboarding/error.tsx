@@ -19,7 +19,7 @@ export default function OnboardingError({
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-12">
       <EmptyState
-        icon={AlertTriangle}
+        icon={<AlertTriangle className="h-8 w-8 text-muted-foreground" />}
         title="Something went wrong"
         description="We could not load this step. Please try again."
         action={{ label: "Try again", onClick: reset }}

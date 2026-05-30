@@ -19,7 +19,7 @@ export default function AuthError({
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <EmptyState
-        icon={AlertTriangle}
+        icon={<AlertTriangle className="h-8 w-8 text-muted-foreground" />}
         title="Something went wrong"
         description="We could not load this page. Please try again."
         action={{ label: "Try again", onClick: reset }}

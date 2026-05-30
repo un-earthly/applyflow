@@ -9,11 +9,11 @@ function ExtensionSuccessContent(): React.ReactElement {
   const code = searchParams.get("code");
 
   useEffect(() => {
-    // Extension background monitors tabs for this URL and extracts the code
-    // Auto-close after a short delay (the extension should have captured the code)
-    if (code) {
-      const timer = setTimeout(() => window.close(), 3000);
-      return () => clearTimeout(timer);
+    // Legacy fallback: notify opener via postMessage if present.
+    // The primary mechanism is the content-script bridge (hidden DOM element).
+    if (code && window.opener) {
+      console.log("[ApplyFlow] Posting pairing code to opener:", code);
+      window.opener.postMessage({ type: "APPLYFLOW_PAIR", code }, "*");
     }
   }, [code]);
 
@@ -22,8 +22,10 @@ function ExtensionSuccessContent(): React.ReactElement {
       <CheckCircle2 className="h-16 w-16 text-green-500" />
       <h1 className="text-2xl font-semibold">You&apos;re signed in!</h1>
       <p className="text-muted-foreground max-w-sm text-sm">
-        The ApplyFlow extension is now connected to your account. You can close this tab.
+        The ApplyFlow extension is now connecting to your account. You can close this tab.
       </p>
+      {/* Hidden bridge element for content-script extraction — more reliable than tabs.onUpdated */}
+      {code && <div id="af-extension-bridge" data-code={code} style={{ display: "none" }} />}
     </div>
   );
 }

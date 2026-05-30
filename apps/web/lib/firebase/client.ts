@@ -19,6 +19,7 @@ export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
 
-if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-}
+// Auth emulator disabled — using real Firebase Auth in all environments
+// if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+//   connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+// }

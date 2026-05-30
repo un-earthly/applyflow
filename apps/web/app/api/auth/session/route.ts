@@ -36,6 +36,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       path: "/",
     });
 
+    // Also set a non-httpOnly cookie so the extension can read the ID token
+    response.cookies.set("af_id_token", idToken, {
+      maxAge: 60 * 60, // 1 hour — Firebase ID token lifetime
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+
     return response;
   } catch (error) {
     console.error("Session creation error:", error);
@@ -46,5 +55,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 export async function DELETE(): Promise<NextResponse> {
   const response = NextResponse.json({ ok: true });
   response.cookies.delete("session");
+  response.cookies.delete("af_id_token");
   return response;
 }

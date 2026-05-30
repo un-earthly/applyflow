@@ -82,7 +82,7 @@ export default function DashboardPage(): React.ReactElement {
           <CardContent>
             {recentApplications.length === 0 ? (
               <EmptyState
-                icon={Briefcase}
+                icon={<Briefcase className="h-8 w-8 text-muted-foreground" />}
                 title="No applications yet"
                 description="Install the browser extension or add applications manually to start tracking."
                 action={{ label: "Add application", onClick: () => (window.location.href = "/dashboard/applications/new") }}
