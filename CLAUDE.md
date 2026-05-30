@@ -91,7 +91,10 @@ There is no test runner configured yet.
 - [`apps/extension/entrypoints/popup/tabs/settings.tsx`](apps/extension/entrypoints/popup/tabs/settings.tsx) — account, behavior toggles, resume switcher
 - [`apps/extension/entrypoints/popup/style.css`](apps/extension/entrypoints/popup/style.css) — design system: `.glass`, `.glass-strong`, `.toggle-track/.toggle-thumb`, `.btn`, `.pill`, `.spinner`
 
-**Critical popup rule:** The popup must NEVER call `chrome.cookies`, `chrome.storage`, or `chrome.tabs` for auth purposes. It sends `GET_AUTH_STATUS` to the background, which handles all Chrome API calls and cookie discovery.
+**Critical popup rules:**
+- The popup must NEVER `await chrome.runtime.sendMessage(...)` for **read** operations. `sendMessage` hangs if the MV3 service worker is cold-starting, causing permanent spinner states. Use `chrome.storage.local.get(...)` directly instead — it is always available in any extension context and never hangs.
+- For **write** operations (toggle settings, log activity), write to `chrome.storage.local` first, then notify the SW fire-and-forget: `chrome.runtime.sendMessage(...).catch(() => {})`.
+- Auth check: popup reads `session:token` from `chrome.storage.local` directly. It then sends `GET_AUTH_STATUS` fire-and-forget to wake the SW for cookie sync; `chrome.storage.onChanged` notifies the popup when the token arrives.
 
 **Extension auth pairing (how the extension gets a token):**
 1. Popup opens `/login?return=extension` in a tab
