@@ -75,6 +75,45 @@ There is no test runner configured yet.
 
 ---
 
+### Resume template system (`apps/web`)
+
+11 visual templates, each a self-contained React component that renders at exactly 794 × 1123 px (A4).
+
+**Key files:**
+- [`apps/web/lib/resume-templates/types.ts`](apps/web/lib/resume-templates/types.ts) — `ResumeData` type + helpers (`dateRange`, `keywords`, `highlights`, `A4_WIDTH`, `A4_HEIGHT`)
+- [`apps/web/lib/resume-templates/index.ts`](apps/web/lib/resume-templates/index.ts) — `RESUME_TEMPLATES` array + `getTemplate(id)` lookup
+- [`apps/web/lib/resume-templates/templates/`](apps/web/lib/resume-templates/templates/) — 11 template components: `classic`, `modern`, `minimal`, `executive`, `tech`, `elegant`, `bold`, `creative`, `compact`, `gradient`, `sidebar-dark`
+- [`apps/web/components/resume/template-preview.tsx`](apps/web/components/resume/template-preview.tsx) — `<TemplatePreview template={tpl} scale={0.35} data={optionalData} />` — renders any template scaled to thumbnail size using CSS `transform: scale()`
+
+**Data format (`ResumeData` / `JsonData` — same shape):**
+```typescript
+{ basics: { name, label, email, phone, url, summary, location },
+  work: { name (company), position, startDate, endDate, summary }[],
+  education: { institution, studyType, area, startDate, endDate, score }[],
+  skills: { name, level, keywords (comma-sep string) }[],
+  projects: { name, description, url, highlights (newline-sep string), startDate, endDate }[] }
+```
+Stored in Firestore as `jsonData` field on each resume document. Also stores `templateId: string`.
+
+**Template rules:**
+- All templates use inline styles only (no Tailwind) so they render correctly when scaled with `transform: scale()`
+- Templates must render at 794px wide — never use `100%` widths inside templates
+- `skills.keywords` is a comma-separated string; use `keywords()` helper to split it
+- `projects.highlights` is a newline-separated string; use `highlights()` helper to split it
+
+**Resume subpages:**
+- `resumes/page.tsx` — gallery of resume cards with template thumbnails; New Resume dialog (template picker); Upload PDF dialog
+- `resumes/[id]/edit/page.tsx` — 3-pane editor: section nav → form → scaled live preview; template switcher in toolbar
+- `resumes/[id]/preview/page.tsx` — full A4 render of chosen template; template switcher dropdown; PDF + Print buttons
+- `resumes/[id]/tailor/page.tsx` — AI job-description matching wizard
+- `resumes/[id]/versions/page.tsx` — version history with restore
+
+**API routes:**
+- `POST /api/resumes/[id]/export` — renders resume as PDF using `@react-pdf/renderer`; maps `jsonData` → `ResumeContent` for the renderer
+- `POST /api/resumes/parse-pdf` — receives `{ pdfUrl, fileName }`; uses GPT-4o to extract text then GPT-4o-mini to parse into `ResumeData` JSON; falls back to empty scaffold if no `OPENAI_API_KEY`
+
+---
+
 ### Browser extension (`apps/extension`)
 
 **Entrypoints:**
