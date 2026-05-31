@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
     "@firebase/firestore",
     "@firebase/storage",
     "@firebase/database",
+    "uploadthing",
     "@firebase/database-compat",
     "google-auth-library",
     "@react-pdf/renderer",

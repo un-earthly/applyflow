@@ -6,9 +6,9 @@ import {
   collection, query, orderBy, onSnapshot,
   addDoc, serverTimestamp,
 } from "firebase/firestore";
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/hooks/use-auth";
-import { db, storage } from "@/lib/firebase/client";
+import { db } from "@/lib/firebase/client";
+import { useUploadThing } from "@/lib/uploadthing-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -160,38 +160,25 @@ function UploadDialog({
     if (!name) setName(f.name.replace(/\.[^.]+$/, ""));
   };
 
-  const handleUpload = async () => {
-    if (!user || !file || !name.trim()) return;
-    setStatus("uploading");
-    setProgress(0);
-
-    try {
-      // 1. Upload PDF to Firebase Storage
-      const path = `users/${user.uid}/resumes/${Date.now()}_${file.name}`;
-      const sRef = storageRef(storage, path);
-      const uploadTask = uploadBytesResumable(sRef, file);
-
-      const pdfUrl = await new Promise<string>((resolve, reject) => {
-        uploadTask.on(
-          "state_changed",
-          (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 60)),
-          reject,
-          async () => { resolve(await getDownloadURL(uploadTask.snapshot.ref)); },
-        );
-      });
-
+  const { startUpload } = useUploadThing("resumePdf", {
+    headers: async () => {
+      const token = await user!.getIdToken();
+      return { authorization: `Bearer ${token}` };
+    },
+    onUploadProgress: (p) => setProgress(Math.round(p * 0.6)),
+    onClientUploadComplete: async (res) => {
+      const pdfUrl = res[0]?.ufsUrl ?? "";
       setStatus("parsing");
       setProgress(70);
 
-      // 2. Parse PDF → JSON data via API
-      const token = await user.getIdToken();
+      const token = await user!.getIdToken();
       const parseRes = await fetch("/api/resumes/parse-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ pdfUrl, fileName: file.name }),
+        body: JSON.stringify({ pdfUrl, fileName: file?.name }),
       });
 
-      let jsonData = { basics: { name: user.displayName ?? "", email: user.email ?? "", phone: "", url: "", summary: "", location: "", label: "" }, work: [], education: [], skills: [], projects: [] };
+      let jsonData = { basics: { name: user?.displayName ?? "", email: user?.email ?? "", phone: "", url: "", summary: "", location: "", label: "" }, work: [], education: [], skills: [], projects: [] };
       if (parseRes.ok) {
         const parsed = await parseRes.json() as { jsonData?: typeof jsonData };
         if (parsed.jsonData) jsonData = parsed.jsonData;
@@ -199,8 +186,7 @@ function UploadDialog({
 
       setProgress(90);
 
-      // 3. Create resume document
-      const ref = await addDoc(collection(db, "users", user.uid, "resumes"), {
+      const docRef = await addDoc(collection(db, "users", user!.uid, "resumes"), {
         name: name.trim(),
         templateId: selectedTemplate.id,
         isDefault: false,
@@ -217,11 +203,17 @@ function UploadDialog({
         setStatus("idle");
         setFile(null);
         setName("");
-        onCreated(ref.id);
+        onCreated(docRef.id);
       }, 600);
-    } catch {
-      setStatus("error");
-    }
+    },
+    onUploadError: () => setStatus("error"),
+  });
+
+  const handleUpload = async () => {
+    if (!user || !file || !name.trim()) return;
+    setStatus("uploading");
+    setProgress(0);
+    await startUpload([file]);
   };
 
   return (

@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { updateProfile } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/hooks/use-auth";
-import { auth, db, storage } from "@/lib/firebase/client";
+import { auth, db } from "@/lib/firebase/client";
+import { useUploadThing } from "@/lib/uploadthing-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,17 +64,24 @@ export default function ProfileSettingsPage(): React.ReactElement {
     }
   };
 
+  const { startUpload } = useUploadThing("avatar", {
+    headers: async () => {
+      const token = await user!.getIdToken();
+      return { authorization: `Bearer ${token}` };
+    },
+    onClientUploadComplete: async (res) => {
+      const url = res[0]?.ufsUrl ?? "";
+      await updateProfile(auth.currentUser!, { photoURL: url });
+      setUploading(false);
+    },
+    onUploadError: () => setUploading(false),
+  });
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setUploading(true);
-    const storageRef = ref(storage, `avatars/${user.uid}`);
-    const task = uploadBytesResumable(storageRef, file);
-    task.on("state_changed", undefined, () => setUploading(false), async () => {
-      const url = await getDownloadURL(task.snapshot.ref);
-      await updateProfile(auth.currentUser!, { photoURL: url });
-      setUploading(false);
-    });
+    await startUpload([file]);
   };
 
   const initials = user?.displayName

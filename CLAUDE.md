@@ -55,7 +55,7 @@ There is no test runner configured yet.
 - `(admin)` — admin-only panel at `/admin/*`
 
 **Auth flow** — key files:
-- [`apps/web/lib/firebase/client.ts`](apps/web/lib/firebase/client.ts) — exports `auth`, `db`, `storage` (client SDK)
+- [`apps/web/lib/firebase/client.ts`](apps/web/lib/firebase/client.ts) — exports `auth`, `db` (client SDK); **no storage export** — file uploads use Uploadthing
 - [`apps/web/hooks/use-auth.tsx`](apps/web/hooks/use-auth.tsx) — `AuthProvider` + `useAuth`; listens to `onIdTokenChanged`, calls `syncSession()` on each token change
 - [`apps/web/app/api/auth/session/route.ts`](apps/web/app/api/auth/session/route.ts) — POST exchanges ID token for an HttpOnly `session` cookie (14 d) **and** a non-HttpOnly `af_id_token` cookie (1 h) the extension can read
 - [`apps/web/lib/server/get-server-user.ts`](apps/web/lib/server/get-server-user.ts) — reads the `session` cookie via Admin SDK; used in all Server Components and API routes
@@ -68,7 +68,7 @@ There is no test runner configured yet.
 - Quota over-limit returns status 402 with `{ code: "QUOTA_EXCEEDED", upgradeUrl }`
 
 **Key `next.config.ts` notes:**
-- `serverExternalPackages` includes all Firebase packages and `@react-pdf/renderer` to prevent bundling issues
+- `serverExternalPackages` includes all Firebase packages, `uploadthing`, and `@react-pdf/renderer` to prevent bundling issues
 - `Cross-Origin-Opener-Policy: unsafe-none` set globally — required for Firebase Auth `signInWithPopup`
 
 **Shared Zod schemas** in [`packages/shared/src/schemas/`](packages/shared/src/schemas/) (`auth`, `profile`, `resume`, `application`, `job`, `coverLetter`, `subscription`, `extension`) — imported as `@repo/shared`.
@@ -107,6 +107,13 @@ Stored in Firestore as `jsonData` field on each resume document. Also stores `te
 - `resumes/[id]/preview/page.tsx` — full A4 render of chosen template; template switcher dropdown; PDF + Print buttons
 - `resumes/[id]/tailor/page.tsx` — AI job-description matching wizard
 - `resumes/[id]/versions/page.tsx` — version history with restore
+
+**File uploads (Uploadthing):**
+- [`apps/web/lib/uploadthing.ts`](apps/web/lib/uploadthing.ts) — server-side file router; `resumePdf` (16MB PDF) and `avatar` (4MB image) routes; both verify Firebase ID token in middleware via Admin SDK
+- [`apps/web/lib/uploadthing-client.ts`](apps/web/lib/uploadthing-client.ts) — typed `useUploadThing` + `uploadFiles` client helpers
+- [`apps/web/app/api/uploadthing/route.ts`](apps/web/app/api/uploadthing/route.ts) — Next.js route handler
+- Client usage: `useUploadThing("resumePdf", { headers: async () => ({ authorization: \`Bearer ${token}\` }) })`
+- Always use `file.ufsUrl` (not deprecated `file.url`) for file URLs
 
 **API routes:**
 - `POST /api/resumes/[id]/export` — renders resume as PDF using `@react-pdf/renderer`; maps `jsonData` → `ResumeContent` for the renderer
@@ -225,13 +232,12 @@ User clicks Fill / Review:
 
 ### Environment variables
 
-**Web ([`apps/web/.env.local`](apps/web/.env.local)):**
+**Web ([`apps/web/.env`](apps/web/.env)):**
 ```
-# Firebase client
+# Firebase client (auth + Firestore only — no Storage)
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
@@ -240,6 +246,9 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=        # keep \n escaping — admin.ts calls .replace(/\\n/g, "\n")
+
+# File uploads (Uploadthing)
+UPLOADTHING_TOKEN=
 
 # Stripe
 STRIPE_SECRET_KEY=

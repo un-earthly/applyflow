@@ -2,10 +2,10 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
-import { db, storage } from "@/lib/firebase/client";
+import { db } from "@/lib/firebase/client";
+import { useUploadThing } from "@/lib/uploadthing-client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { FileText, Upload, Plus } from "lucide-react";
@@ -34,29 +34,28 @@ export default function ResumePage(): React.ReactElement {
     if (f) handleFile(f);
   };
 
+  const { startUpload } = useUploadThing("resumePdf", {
+    headers: async () => {
+      const token = await user!.getIdToken();
+      return { authorization: `Bearer ${token}` };
+    },
+    onUploadProgress: (p) => setUploadProgress(p),
+    onClientUploadComplete: async (res) => {
+      const url = res[0]?.ufsUrl ?? "";
+      await setDoc(
+        doc(db, "profiles", user!.uid),
+        { resumeUrl: url, resumeName: file?.name, updatedAt: new Date() },
+        { merge: true },
+      );
+      router.push("/onboarding/preferences");
+    },
+    onUploadError: () => setUploading(false),
+  });
+
   const handleUpload = async () => {
     if (!user || !file) return;
     setUploading(true);
-
-    const storageRef = ref(storage, `resumes/${user.uid}/${Date.now()}_${file.name}`);
-    const task = uploadBytesResumable(storageRef, file);
-
-    task.on(
-      "state_changed",
-      (snap) => {
-        setUploadProgress((snap.bytesTransferred / snap.totalBytes) * 100);
-      },
-      () => setUploading(false),
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        await setDoc(
-          doc(db, "profiles", user.uid),
-          { resumeUrl: url, resumeName: file.name, updatedAt: new Date() },
-          { merge: true },
-        );
-        router.push("/onboarding/preferences");
-      },
-    );
+    await startUpload([file]);
   };
 
   return (
