@@ -5,7 +5,7 @@ export default defineConfig({
   manifest: {
     name: 'ApplyFlow',
     description: 'AI-powered job application assistant',
-    permissions: ['storage', 'tabs', 'cookies'],
+    permissions: ['storage', 'tabs', 'cookies', 'alarms'],
     host_permissions: ['<all_urls>'],
   },
   vite: () => ({

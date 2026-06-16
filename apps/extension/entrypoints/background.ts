@@ -1,4 +1,4 @@
-export default () => {
+export default defineBackground(() => {
   interface MessageRequest {
     type: string;
     [key: string]: any;
@@ -30,6 +30,13 @@ export default () => {
       const res = await fetch(`${baseUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${cookie.value}` },
       });
+      if (res.status === 401) {
+        // Token inside the cookie is expired. Remove the stale cookie so it
+        // doesn't block re-auth — the web app will set a fresh one on next login.
+        await chrome.cookies.remove({ url: baseUrl, name: "af_id_token" });
+        console.warn("[ApplyFlow BG] af_id_token expired, removed stale cookie");
+        return false;
+      }
       if (!res.ok) return false;
 
       const userData = await res.json() as Record<string, unknown>;
@@ -48,6 +55,22 @@ export default () => {
   // Run cookie sync on service-worker startup so the popup is already authed
   // when the user first opens it after logging in on the web app.
   void syncAuthFromCookie();
+
+  // React to af_id_token being set/refreshed while the SW is already alive.
+  // Without this, the SW only picks up the cookie at startup — logging in on
+  // the web app while the extension is already running would never sync.
+  chrome.cookies.onChanged.addListener((changeInfo) => {
+    if (changeInfo.cookie.name !== "af_id_token") return;
+    if (changeInfo.removed) {
+      // User logged out of the web app — mirror that in the extension.
+      void chrome.storage.local.remove(["session:token", "auth:user"]);
+      return;
+    }
+    // Clear stored token so syncAuthFromCookie() doesn't short-circuit.
+    void chrome.storage.local.remove(["session:token", "auth:user"]).then(() =>
+      syncAuthFromCookie()
+    );
+  });
 
   // ── Message bus ─────────────────────────────────────────────────────────────
 
@@ -343,22 +366,25 @@ export default () => {
   });
 
   // ── Token refresh alarm (every 50 min) ──────────────────────────────────────
-
-  chrome.alarms.create("token-refresh", { periodInMinutes: 50 });
-  chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== "token-refresh") return;
-    const token = await getAuthToken();
-    if (!token) return;
-    try {
-      const res = await fetch(`${APP_URL}/api/auth/session`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        // Token expired — clear session so popup shows sign-in
-        await chrome.storage.local.remove(["session:token", "auth:user"]);
+  // Guard: chrome.alarms may be undefined if the permission hasn't propagated
+  // to Chrome yet (e.g. first load after adding the manifest permission).
+  if (chrome.alarms) {
+    chrome.alarms.create("token-refresh", { periodInMinutes: 50 });
+    chrome.alarms.onAlarm.addListener(async (alarm) => {
+      if (alarm.name !== "token-refresh") return;
+      const token = await getAuthToken();
+      if (!token) return;
+      try {
+        const res = await fetch(`${APP_URL}/api/auth/session`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) {
+          // Token expired — clear session so popup shows sign-in
+          await chrome.storage.local.remove(["session:token", "auth:user"]);
+        }
+      } catch {
+        // Silently ignore; next alarm will retry
       }
-    } catch {
-      // Silently ignore; next alarm will retry
-    }
-  });
-};
+    });
+  }
+});
