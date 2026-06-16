@@ -20,9 +20,8 @@ interface FieldSchema {
   type?: string;
   placeholder?: string;
   required?: boolean;
+  options?: string[];
 }
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const uid = await getUid(req);
@@ -33,32 +32,60 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     resumeId?: string;
   };
 
-  let profileData: Record<string, unknown> = {};
+  let profileSummary: Record<string, unknown> = {};
+
   if (resumeId) {
     const snap = await adminDb().collection("users").doc(uid).collection("resumes").doc(resumeId).get();
     if (snap.exists) {
-      profileData = (snap.data()!.content as Record<string, unknown>) ?? {};
+      const jd = (snap.data()!.jsonData ?? {}) as {
+        basics?: Record<string, unknown>;
+        work?: unknown[];
+        skills?: unknown[];
+      };
+      const basics = jd.basics ?? {};
+      profileSummary = {
+        fullName: basics.name,
+        email: basics.email,
+        phone: basics.phone,
+        location: basics.location,
+        linkedin: basics.url,
+        website: basics.url,
+        summary: basics.summary,
+      };
     }
-  } else {
-    const profileSnap = await adminDb().collection("profiles").doc(uid).get();
-    profileData = profileSnap.data() ?? {};
   }
 
-  const profileSummary = {
-    fullName: profileData.fullName,
-    email: profileData.email,
-    phone: profileData.phone,
-    location: profileData.location,
-    linkedin: profileData.linkedin,
-    website: profileData.website,
-  };
+  // Merge in profile-level data (work auth, LinkedIn URL, etc.)
+  const profileSnap = await adminDb().collection("profiles").doc(uid).get();
+  if (profileSnap.exists) {
+    const p = profileSnap.data()!;
+    profileSummary = {
+      ...profileSummary,
+      fullName: profileSummary.fullName ?? p.fullName,
+      email: profileSummary.email ?? p.email,
+      phone: profileSummary.phone ?? p.phone,
+      location: profileSummary.location ?? p.location,
+      linkedin: profileSummary.linkedin ?? p.linkedInUrl,
+      website: profileSummary.website ?? p.portfolioUrl,
+      workAuthStatus: p.workAuthStatus,
+      yearsOfExperience: p.yearsOfExperience,
+    };
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ mappings: heuristicMap(fields, profileSummary), confidence: 1 });
   }
 
   try {
-    const prompt = `You are a job application assistant. Given the user profile and a list of form fields, return a JSON object mapping each field's \`name\` to the appropriate value from the profile. If no match, use an empty string.
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const prompt = `You are a job application assistant. Given the user profile and a list of form fields, return a JSON object mapping each field's \`name\` to the appropriate value from the profile.
+
+Rules:
+- For select/dropdown fields, pick the option text from the "options" array that best matches the profile. Return the exact option text.
+- For work authorization fields, use the workAuthStatus value (citizen, permanent_resident, visa_required, etc.)
+- For radio/checkbox fields, return "yes" or "no" based on context
+- If no match, use an empty string
 
 Profile:
 ${JSON.stringify(profileSummary, null, 2)}
@@ -104,6 +131,8 @@ function heuristicMap(
     else if (key.includes("linkedin")) mappings[field.name] = (profile.linkedin as string) ?? "";
     else if (key.includes("website") || key.includes("portfolio"))
       mappings[field.name] = (profile.website as string) ?? "";
+    else if (key.includes("work auth") || key.includes("authorization") || key.includes("visa"))
+      mappings[field.name] = (profile.workAuthStatus as string) ?? "";
   }
   return mappings;
 }

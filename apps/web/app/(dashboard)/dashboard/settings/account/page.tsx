@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import {
   updateEmail,
   updatePassword,
@@ -16,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Sun, Moon, Monitor } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function PasswordSection(): React.ReactElement {
   const [current, setCurrent] = useState("");
@@ -73,8 +75,15 @@ function PasswordSection(): React.ReactElement {
   );
 }
 
+const THEMES = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+] as const;
+
 export default function AccountSettingsPage(): React.ReactElement {
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSent, setResendSent] = useState(false);
 
@@ -95,6 +104,32 @@ export default function AccountSettingsPage(): React.ReactElement {
         <h2 className="text-lg font-medium">Account</h2>
         <p className="text-muted-foreground text-sm">Manage your email and password.</p>
       </div>
+      <Separator />
+
+      <div className="space-y-3">
+        <div>
+          <h3 className="font-medium">Appearance</h3>
+          <p className="text-muted-foreground text-sm">Choose how ApplyFlow looks to you.</p>
+        </div>
+        <div className="flex gap-2">
+          {THEMES.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setTheme(value)}
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
+                theme === value
+                  ? "border-primary bg-primary/5 font-medium"
+                  : "border-border hover:border-primary/40 text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Separator />
 
       <div className="space-y-3">

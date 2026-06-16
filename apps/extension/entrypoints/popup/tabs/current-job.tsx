@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Scan, Zap, Eye } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Scan, Zap, Eye, Briefcase } from 'lucide-react';
 
 interface DetectedField {
   label: string;
@@ -7,13 +7,21 @@ interface DetectedField {
   confidence: number;
 }
 
-type DetectionStatus = 'loading' | 'detected' | 'unsupported' | 'empty';
+interface DetectedJob {
+  jobTitle?: string;
+  company?: string;
+  url?: string;
+  boardName?: string;
+}
+
+type DetectionStatus = 'loading' | 'detected' | 'easy-apply' | 'unsupported' | 'empty';
 
 interface Detection {
   status: DetectionStatus;
   board?: string;
   fields?: DetectedField[];
   message?: string;
+  job?: DetectedJob;
 }
 
 function confidenceColor(c: number): string {
@@ -31,6 +39,15 @@ export default function CurrentJobTab() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) { setDetection({ status: 'empty', message: 'No active tab.' }); return; }
 
+        // Fast path: check storage for LinkedIn Easy Apply detection (no sendMessage needed)
+        const items = await chrome.storage.local.get(['detected:job']);
+        const job = items['detected:job'] as DetectedJob | undefined;
+        if (job?.url && tab.url && job.url === tab.url) {
+          setDetection({ status: 'easy-apply', job });
+          return;
+        }
+
+        // Fall back to DETECT_FORM for other job boards
         const response = await chrome.tabs.sendMessage(tab.id, { type: 'DETECT_FORM' }).catch(() => null);
 
         if (!response) {
@@ -58,17 +75,16 @@ export default function CurrentJobTab() {
     window.close();
   };
 
+  const doEasyApply = async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    await chrome.tabs.sendMessage(tab.id, { type: 'CLICK_EASY_APPLY' });
+    window.close();
+  };
+
   const S: Record<string, React.CSSProperties> = {
     center: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 380, gap: 14, textAlign: 'center' },
-    boardBadge: {
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '5px 12px', borderRadius: 20,
-      background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.25)',
-      color: '#34d399', fontSize: 12, fontWeight: 600, marginBottom: 14,
-    },
-    fieldRow: {
-      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-    },
+    fieldRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px' },
     actionRow: { display: 'flex', gap: 8, marginTop: 4 },
   };
 
@@ -78,6 +94,47 @@ export default function CurrentJobTab() {
       <div style={S.center}>
         <div className="spinner" />
         <span style={{ fontSize: 13, color: 'rgba(241,245,249,0.4)' }}>Scanning page…</span>
+      </div>
+    );
+  }
+
+  // ── LinkedIn Easy Apply ──────────────────────────────────────────────────
+  if (detection.status === 'easy-apply') {
+    const job = detection.job ?? {};
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="glass-strong" style={{ padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: 'linear-gradient(135deg, #0a66c2, #0077b5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 16px rgba(10,102,194,0.4)',
+            }}>
+              <Briefcase size={20} color="#fff" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: 'rgba(241,245,249,0.4)', marginBottom: 2 }}>LinkedIn · Easy Apply</div>
+              <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {job.jobTitle || 'Job detected'}
+              </div>
+              {job.company && (
+                <div style={{ fontSize: 12, color: 'rgba(241,245,249,0.5)', marginTop: 1 }}>{job.company}</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="glass" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: 12, color: 'rgba(241,245,249,0.5)', lineHeight: 1.6 }}>
+            ApplyFlow will open the Easy Apply modal, fill in your details across all steps, and advance through the form automatically.
+          </div>
+        </div>
+
+        <button className="btn btn-primary btn-full" onClick={doEasyApply}>
+          <Zap size={14} />
+          Easy Apply
+        </button>
       </div>
     );
   }
@@ -117,13 +174,12 @@ export default function CurrentJobTab() {
     );
   }
 
-  // ── Detected ─────────────────────────────────────────────────────────────
+  // ── Detected (form already visible) ─────────────────────────────────────
   const fields = detection.fields ?? [];
   const avgConf = fields.length ? fields.reduce((s, f) => s + f.confidence, 0) / fields.length : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Board header */}
       <div className="glass-strong" style={{ padding: '14px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
@@ -149,7 +205,6 @@ export default function CurrentJobTab() {
         </div>
       </div>
 
-      {/* Field list */}
       {fields.length > 0 && (
         <div className="glass" style={{ overflow: 'hidden' }}>
           <div style={{ maxHeight: 220, overflowY: 'auto' }}>
@@ -177,7 +232,6 @@ export default function CurrentJobTab() {
         </div>
       )}
 
-      {/* Actions */}
       <div style={S.actionRow}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => doFill(true)}>
           <Eye size={14} />

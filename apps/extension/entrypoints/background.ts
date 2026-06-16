@@ -19,7 +19,10 @@ export default defineBackground(() => {
   async function syncAuthFromCookie(): Promise<boolean> {
     try {
       const items = await chrome.storage.local.get(["session:token"]);
-      if (items["session:token"]) return true; // already have a token
+      if (items["session:token"]) {
+        void fetchAndCacheResumes(items["session:token"] as string);
+        return true;
+      }
 
       const cookies = await chrome.cookies.getAll({ name: "af_id_token" });
       if (!cookies.length) return false;
@@ -45,10 +48,27 @@ export default defineBackground(() => {
         "auth:user": userData,
       });
       console.log("[ApplyFlow BG] Cookie auto-sync succeeded for domain:", cookie.domain);
+      void fetchAndCacheResumes(cookie.value, baseUrl);
       return true;
     } catch (e) {
       console.warn("[ApplyFlow BG] Cookie auto-sync failed:", e);
       return false;
+    }
+  }
+
+  async function fetchAndCacheResumes(token: string, baseUrl?: string): Promise<void> {
+    try {
+      const url = `${baseUrl ?? APP_URL}/api/resumes`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { resumes: { id: string; name: string; isDefault?: boolean; pdfUrl?: string }[] };
+      const mapped = (data.resumes ?? []).map(r => ({ id: r.id, name: r.name, isDefault: r.isDefault ?? false, pdfUrl: r.pdfUrl ?? "" }));
+      await chrome.storage.local.set({ "cache:resumes": mapped });
+      console.log("[ApplyFlow BG] Cached", mapped.length, "resumes");
+    } catch (e) {
+      console.warn("[ApplyFlow BG] Failed to cache resumes:", e);
     }
   }
 
@@ -143,6 +163,10 @@ export default defineBackground(() => {
 
         case "FIELD_MAP_REQUEST":
           await handleFieldMapRequest(request.payload, sender.tab?.id);
+          sendResponse({ success: true });
+          break;
+
+        case "JOB_DETECTED":
           sendResponse({ success: true });
           break;
 
@@ -276,7 +300,7 @@ export default defineBackground(() => {
   // ── LLM field-map proxy ───────────────────────────────────────────────────────
 
   async function handleFieldMapRequest(
-    payload: { fields: { name: string; label: string }[] },
+    payload: { fields: { name: string; label: string; type?: string; options?: string[] }[]; resumeId?: string },
     tabId: number | undefined,
   ) {
     if (!tabId) return;
@@ -294,7 +318,8 @@ export default defineBackground(() => {
       });
 
       if (!res.ok) return;
-      const mappings = (await res.json()) as Record<string, string>;
+      const body = await res.json() as { mappings?: Record<string, string> };
+      const mappings = body.mappings ?? (body as Record<string, string>);
 
       chrome.tabs.sendMessage(tabId, {
         type: "FIELD_MAP_RESPONSE",
@@ -340,6 +365,7 @@ export default defineBackground(() => {
         } catch { /* non-fatal */ }
 
         await chrome.storage.local.set({ "session:token": idToken, "auth:user": userData });
+        void fetchAndCacheResumes(idToken, base);
         console.log("[ApplyFlow BG] Extension auth pairing succeeded via:", base);
         return true;
       } catch { /* try next */ }

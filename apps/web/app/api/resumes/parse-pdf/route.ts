@@ -2,6 +2,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 import OpenAI from "openai";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
 
 async function getUid(req: NextRequest): Promise<string | null> {
   const token = req.headers.get("authorization")?.slice(7);
@@ -74,6 +78,14 @@ Rules:
 - If a field is not present, use an empty string
 - Return ONLY valid JSON, no markdown fences or explanation`;
 
+const EMPTY_SCAFFOLD = {
+  basics: { name: "", label: "", email: "", phone: "", url: "", location: "", summary: "" },
+  work: [],
+  education: [],
+  skills: [],
+  projects: [],
+};
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const uid = await getUid(req);
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -84,67 +96,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "pdfUrl or rawText required" }, { status: 400 });
   }
 
-  // If no OpenAI key, return empty scaffold — user fills it in
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({
-      jsonData: {
-        basics: { name: "", label: "", email: "", phone: "", url: "", location: "", summary: "" },
-        work: [],
-        education: [],
-        skills: [],
-        projects: [],
-      },
+      jsonData: EMPTY_SCAFFOLD,
       warning: "AI parsing requires OPENAI_API_KEY. Resume created with empty fields.",
     });
   }
 
   let textContent = body.rawText ?? "";
 
-  // If we have a PDF URL, fetch the PDF and extract text via OpenAI Files API
   if (body.pdfUrl && !textContent) {
     try {
       const pdfRes = await fetch(body.pdfUrl);
-      if (!pdfRes.ok) throw new Error("Failed to fetch PDF");
-      const pdfBytes = await pdfRes.arrayBuffer();
-      const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
-
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-      // Upload the PDF as a file for vision-based extraction
-      const file = await client.files.create({
-        file: new File([pdfBlob], body.fileName ?? "resume.pdf", { type: "application/pdf" }),
-        purpose: "assistants",
-      });
-
-      // Use GPT-4o to extract text from the PDF via vision
-      const extraction = await client.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Please extract all text content from this PDF resume exactly as written. Return only the raw text, preserving structure.",
-              },
-              {
-                type: "text",
-                text: `[PDF file ID: ${file.id}]`,
-              },
-            ],
-          },
-        ],
-        max_tokens: 4000,
-      });
-
-      textContent = extraction.choices[0]?.message.content ?? "";
-
-      // Clean up the uploaded file
-      await client.files.delete(file.id).catch(() => {});
-    } catch {
-      // Fallback: try fetching URL as text (won't work for binary PDF but handles edge cases)
-      textContent = `PDF from: ${body.pdfUrl}`;
+      if (!pdfRes.ok) throw new Error(`Failed to fetch PDF: ${pdfRes.status}`);
+      const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+      const parsed = await pdfParse(pdfBuffer);
+      textContent = parsed.text;
+    } catch (err) {
+      console.warn("[parse-pdf] PDF extraction failed:", err);
+      return NextResponse.json({ jsonData: EMPTY_SCAFFOLD, warning: "Could not extract PDF text." });
     }
+  }
+
+  if (!textContent.trim()) {
+    return NextResponse.json({ jsonData: EMPTY_SCAFFOLD, warning: "PDF appears to be empty or image-only." });
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -153,7 +128,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Parse this resume text:\n\n${textContent}` },
+      { role: "user", content: `Parse this resume text:\n\n${textContent.slice(0, 12000)}` },
     ],
     response_format: { type: "json_object" },
     max_tokens: 3000,

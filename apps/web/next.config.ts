@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
     "@firebase/database-compat",
     "google-auth-library",
     "@react-pdf/renderer",
+    "pdf-parse",
   ],
 };
 

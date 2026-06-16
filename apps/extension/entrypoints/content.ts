@@ -2,24 +2,17 @@ export default defineContentScript({
   matches: ["<all_urls>"],
   main() {
     // ── Extension auth bridge ────────────────────────────────────────────────
-    // When the web app redirects to /auth/extension-success after login, extract
-    // the pairing code and send it to the background service worker immediately.
-    // This avoids the race condition between tabs.onUpdated and window.close()
-    // / service-worker lifecycle.
     if (location.pathname === "/auth/extension-success") {
       const sendPairCode = async () => {
         const el = document.getElementById("af-extension-bridge");
         const code = el?.dataset.code ?? new URLSearchParams(location.search).get("code");
         if (code) {
-          console.log("[ApplyFlow Content] Bridge page detected, sending PAIR_CODE:", code);
           try {
             const res = await browser.runtime.sendMessage({ type: "PAIR_CODE", code });
             console.log("[ApplyFlow Content] PAIR_CODE acknowledged:", res);
           } catch (err) {
             console.warn("[ApplyFlow Content] PAIR_CODE send failed:", err);
           }
-        } else {
-          console.warn("[ApplyFlow Content] Bridge page loaded but no pairing code found");
         }
       };
       if (document.readyState === "loading") {
@@ -81,6 +74,27 @@ export default defineContentScript({
     }
 
     let detectionState: DetectionState = { status: "no-form" };
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+    function waitForElement(selector: string, timeout = 3000): Promise<Element | null> {
+      return new Promise(resolve => {
+        const el = document.querySelector(selector);
+        if (el) { resolve(el); return; }
+        const obs = new MutationObserver(() => {
+          const found = document.querySelector(selector);
+          if (found) { obs.disconnect(); resolve(found); }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => { obs.disconnect(); resolve(null); }, timeout);
+      });
+    }
+
+    // Native value setter — required for React-controlled inputs (LinkedIn uses React)
+    const nativeInputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    const nativeTextareaSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
 
     // ── Shadow DOM host setup ────────────────────────────────────────────────
 
@@ -295,6 +309,21 @@ export default defineContentScript({
       return null;
     }
 
+    function detectLinkedInEasyApply(): { btn: HTMLButtonElement; jobTitle: string; company: string } | null {
+      const btn = document.querySelector<HTMLButtonElement>(
+        'button.jobs-apply-button, button[aria-label*="Easy Apply"], .jobs-apply-button--top-card button',
+      );
+      if (!btn) return null;
+      const jobTitle =
+        document.querySelector(".job-details-jobs-unified-top-card__job-title, .t-24")
+          ?.textContent?.trim() ?? "";
+      const company =
+        document.querySelector(
+          ".jobs-unified-top-card__company-name, .job-details-jobs-unified-top-card__company-name",
+        )?.textContent?.trim() ?? "";
+      return { btn, jobTitle, company };
+    }
+
     function detectForm(domain: string): DetectionState {
       const board = SUPPORTED_BOARDS[domain]!;
       const foundFields: DetectedField[] = [];
@@ -331,6 +360,12 @@ export default defineContentScript({
       return { status: "no-form" };
     }
 
+    async function getDefaultResumeId(): Promise<string | undefined> {
+      const items = await chrome.storage.local.get(["cache:resumes"]);
+      const resumes = (items["cache:resumes"] as Array<{ id: string; isDefault: boolean }>) ?? [];
+      return (resumes.find(r => r.isDefault) ?? resumes[0])?.id;
+    }
+
     async function runDetection() {
       const domain = detectBoard();
       if (!domain) {
@@ -338,58 +373,182 @@ export default defineContentScript({
         return;
       }
 
+      // LinkedIn: check for Easy Apply button first
+      if (domain === "linkedin.com") {
+        const easyApply = detectLinkedInEasyApply();
+        if (easyApply) {
+          await chrome.storage.local.set({
+            "detected:job": {
+              jobTitle: easyApply.jobTitle,
+              company: easyApply.company,
+              url: location.href,
+              boardName: "LinkedIn",
+              detectedAt: new Date().toISOString(),
+            },
+          });
+          browser.runtime.sendMessage({ type: "JOB_DETECTED" }).catch(() => {});
+          // Don't show toast yet — popup handles the Easy Apply UI
+          return;
+        } else {
+          // Button gone (navigated away) — clear stale job detection
+          await chrome.storage.local.remove(["detected:job"]);
+        }
+      }
+
       const result = detectForm(domain);
       detectionState = result;
 
       if (result.status === "detected") {
+        const resumeId = await getDefaultResumeId();
         browser.runtime.sendMessage({
           type: "FIELD_MAP_REQUEST",
           payload: {
             fields: result.fields?.map((f) => ({ name: f.name, label: f.label })) ?? [],
+            resumeId,
           },
         });
         showDetectorToast();
       }
     }
 
-    // ── Fill form ────────────────────────────────────────────────────────────
+    // ── Apply field value (all types) ────────────────────────────────────────
 
-    async function fillForm(overrides: Record<string, string> | null) {
-      if (detectionState.status !== "detected" || !detectionState.fields) return;
+    async function applyFieldValue(el: Element, value: string): Promise<void> {
+      if (!value) return;
 
+      const tag = el.tagName.toLowerCase();
+      const type = (el as HTMLInputElement).type?.toLowerCase() ?? "text";
+
+      if (tag === "select") {
+        const sel = el as HTMLSelectElement;
+        const opt = Array.from(sel.options).find(
+          o => o.value.toLowerCase() === value.toLowerCase() ||
+               o.text.toLowerCase().includes(value.toLowerCase()),
+        );
+        if (opt) {
+          sel.value = opt.value;
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        return;
+      }
+
+      if (tag === "textarea") {
+        const ta = el as HTMLTextAreaElement;
+        if (nativeTextareaSetter) nativeTextareaSetter.call(ta, value);
+        else ta.value = value;
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        ta.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+
+      if (type === "radio") {
+        const group = el.closest("fieldset, [role=radiogroup], .fb-dash-form-element");
+        const radios = (group ?? document).querySelectorAll<HTMLInputElement>(`input[type=radio][name="${(el as HTMLInputElement).name}"]`);
+        const match = Array.from(radios).find(
+          r => r.value.toLowerCase().includes(value.toLowerCase()) ||
+               (r.labels?.[0]?.textContent?.toLowerCase() ?? "").includes(value.toLowerCase()),
+        );
+        if (match) {
+          match.click();
+          match.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        return;
+      }
+
+      if (type === "checkbox") {
+        const cb = el as HTMLInputElement;
+        const affirmative = ["yes", "true", "1", "agree", "accept"].includes(value.toLowerCase());
+        if (affirmative !== cb.checked) cb.click();
+        return;
+      }
+
+      if (type === "file") {
+        try {
+          const items = await chrome.storage.local.get(["cache:resumes"]);
+          const resumes = (items["cache:resumes"] as Array<{ id: string; isDefault: boolean; pdfUrl: string }>) ?? [];
+          const resume = resumes.find(r => r.isDefault) ?? resumes[0];
+          if (resume?.pdfUrl) {
+            const pdfRes = await fetch(resume.pdfUrl);
+            const blob = await pdfRes.blob();
+            const file = new File([blob], "resume.pdf", { type: "application/pdf" });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            (el as HTMLInputElement).files = dt.files;
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        } catch {
+          // File injection failed silently — user can upload manually
+        }
+        return;
+      }
+
+      // text / email / tel / url / number / date
+      const input = el as HTMLInputElement;
+      if (nativeInputSetter) nativeInputSetter.call(input, value);
+      else input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // ── Fill container (replaces old fillForm for all contexts) ──────────────
+
+    async function fillContainer(
+      container: Element,
+      overrides: Record<string, string> | null = null,
+    ): Promise<void> {
       const profile = (await browser.runtime.sendMessage({ type: "GET_SESSION" })) as
         | { fullName?: string; email?: string; phone?: string }
         | null;
 
-      const domain = detectBoard();
-      const selectors = domain ? (SUPPORTED_BOARDS[domain]?.selectors ?? []) : [];
+      const inputs = Array.from(
+        container.querySelectorAll<Element>("input, textarea, select"),
+      ).filter(el => {
+        const type = (el as HTMLInputElement).type?.toLowerCase();
+        return type !== "hidden" && type !== "submit" && type !== "button" && type !== "reset";
+      });
 
-      const valueFor = (el: HTMLInputElement): string => {
-        if (overrides) {
-          const key = el.name || el.id;
-          if (overrides[key] !== undefined) return overrides[key];
-        }
-        if (!profile) return "";
-        const key = (el.name + el.id + el.placeholder).toLowerCase();
-        if (key.includes("first")) return profile.fullName?.split(" ")[0] ?? "";
-        if (key.includes("last")) return profile.fullName?.split(" ").slice(1).join(" ") ?? "";
-        if (key.includes("name")) return profile.fullName ?? "";
-        if (key.includes("email")) return profile.email ?? "";
-        if (key.includes("phone") || key.includes("tel")) return profile.phone ?? "";
-        return "";
-      };
+      for (const el of inputs) {
+        const input = el as HTMLInputElement;
+        const key = input.name || input.id || "";
+        const labelEl =
+          input.labels?.[0] ??
+          container.querySelector(`label[for="${input.id}"]`);
+        const labelText =
+          labelEl?.textContent?.trim() ??
+          input.getAttribute("aria-label") ??
+          input.placeholder ??
+          key;
 
-      for (const selector of selectors) {
-        const el = document.querySelector<HTMLInputElement>(selector);
-        if (!el) continue;
-        const value = valueFor(el);
-        if (value) {
-          el.value = value;
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
+        let value = "";
+
+        if (overrides?.[key] !== undefined) {
+          value = overrides[key];
+        } else if (detectionState.fields) {
+          const mapped = detectionState.fields.find(f => f.name === key)?.mappedValue;
+          if (mapped) value = mapped;
         }
+
+        // Heuristic fallback from profile
+        if (!value && profile) {
+          const hint = (key + " " + labelText).toLowerCase();
+          if (hint.includes("first") && hint.includes("name"))
+            value = profile.fullName?.split(" ")[0] ?? "";
+          else if (hint.includes("last") && hint.includes("name"))
+            value = profile.fullName?.split(" ").slice(1).join(" ") ?? "";
+          else if (hint.includes("name")) value = profile.fullName ?? "";
+          else if (hint.includes("email")) value = profile.email ?? "";
+          else if (hint.includes("phone") || hint.includes("tel")) value = profile.phone ?? "";
+        }
+
+        if (value) await applyFieldValue(el, value);
       }
+    }
 
+    // ── Legacy fillForm (used by review panel + FILL_FORM message) ───────────
+
+    async function fillForm(overrides: Record<string, string> | null) {
+      if (detectionState.status !== "detected" || !detectionState.fields) return;
+      await fillContainer(document.body, overrides);
       browser.runtime.sendMessage({
         type: "LOG_ACTIVITY",
         payload: {
@@ -400,6 +559,96 @@ export default defineContentScript({
           timestamp: new Date().toISOString(),
         },
       });
+    }
+
+    // ── LinkedIn multi-step Easy Apply handler ───────────────────────────────
+
+    async function clickEasyApplyAndFill(): Promise<void> {
+      const result = detectLinkedInEasyApply();
+      if (!result) return;
+
+      result.btn.click();
+
+      const modal = await waitForElement(
+        '.jobs-easy-apply-content, [data-test-modal], .jobs-easy-apply-modal',
+        4000,
+      );
+      if (!modal) {
+        console.warn("[ApplyFlow] Easy Apply modal did not appear");
+        return;
+      }
+
+      const resumeId = await getDefaultResumeId();
+      const MAX_STEPS = 10;
+
+      for (let step = 0; step < MAX_STEPS; step++) {
+        await sleep(700);
+
+        // Fill all visible fields in the modal
+        await fillContainer(modal);
+
+        // Check for submit button
+        const submitBtn = modal.querySelector<HTMLButtonElement>(
+          'button[aria-label*="Submit application"], button[aria-label*="submit application"]',
+        );
+        if (submitBtn) {
+          const prefs = (await chrome.storage.local.get(["settings:preferences"]))["settings:preferences"] as
+            | { autoSubmit?: boolean }
+            | undefined;
+          if (prefs?.autoSubmit) {
+            submitBtn.click();
+            browser.runtime.sendMessage({
+              type: "LOG_ACTIVITY",
+              payload: {
+                type: "applied",
+                url: location.href,
+                boardName: "LinkedIn",
+                fieldsCount: 0,
+                timestamp: new Date().toISOString(),
+              },
+            }).catch(() => {});
+          }
+          return;
+        }
+
+        // Advance to next step
+        const nextBtn =
+          modal.querySelector<HTMLButtonElement>('button[aria-label*="Continue to next step"]') ??
+          modal.querySelector<HTMLButtonElement>('button[aria-label*="Review your application"]') ??
+          modal.querySelector<HTMLButtonElement>('button[aria-label*="Next"]') ??
+          modal.querySelector<HTMLButtonElement>("footer button:last-child");
+
+        if (!nextBtn) break;
+
+        // Request LLM mapping for this step's fields before advancing
+        const stepInputs = Array.from(modal.querySelectorAll<Element>("input, select, textarea"))
+          .filter(el => {
+            const type = (el as HTMLInputElement).type?.toLowerCase();
+            return type !== "hidden" && type !== "submit" && type !== "button";
+          });
+        if (stepInputs.length > 0) {
+          const fields = stepInputs.map(el => {
+            const inp = el as HTMLInputElement;
+            const isSelect = el.tagName === "SELECT";
+            const isTextarea = el.tagName === "TEXTAREA";
+            return {
+              name: inp.name || inp.id || "",
+              label: inp.labels?.[0]?.textContent?.trim() ?? el.getAttribute("aria-label") ?? inp.placeholder ?? inp.name ?? "",
+              type: isSelect ? "select" : isTextarea ? "textarea" : inp.type ?? "text",
+              options: isSelect
+                ? Array.from((el as unknown as HTMLSelectElement).options).map(o => o.text)
+                : undefined,
+            };
+          });
+          browser.runtime.sendMessage({
+            type: "FIELD_MAP_REQUEST",
+            payload: { fields, resumeId },
+          }).catch(() => {});
+          await sleep(300);
+        }
+
+        nextBtn.click();
+      }
     }
 
     // ── Message listener ─────────────────────────────────────────────────────
@@ -417,8 +666,10 @@ export default defineContentScript({
       } else if (request.type === "SHOW_REVIEW_PANEL") {
         showReviewPanel();
         sendResponse({ success: true });
+      } else if (request.type === "CLICK_EASY_APPLY") {
+        void clickEasyApplyAndFill();
+        sendResponse({ success: true });
       } else if (request.type === "FIELD_MAP_RESPONSE") {
-        // Background returns mapped values from the LLM proxy
         const mappings = request.payload as Record<string, string>;
         if (detectionState.fields) {
           detectionState.fields = detectionState.fields.map((f) => ({
@@ -434,14 +685,19 @@ export default defineContentScript({
 
     setTimeout(() => { void runDetection(); }, 1000);
 
+    let detectionDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const observer = new MutationObserver(() => {
-      if (
-        !document.getElementById("applyflow-toast-host") &&
-        !document.getElementById("applyflow-panel-host")
-      ) {
-        void runDetection();
-      }
+      if (detectionDebounceTimer) return;
+      detectionDebounceTimer = setTimeout(() => {
+        detectionDebounceTimer = null;
+        if (
+          !document.getElementById("applyflow-toast-host") &&
+          !document.getElementById("applyflow-panel-host")
+        ) {
+          void runDetection();
+        }
+      }, 400);
     });
-    observer.observe(document.body, { childList: true, subtree: false });
+    observer.observe(document.body, { childList: true, subtree: true });
   },
 });
